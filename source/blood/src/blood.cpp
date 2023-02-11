@@ -604,7 +604,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
             && gEpisodeInfo[gGameOptions.nEpisode].cutsceneASmkPath[0])
             gGameOptions.uGameFlags |= kGameFlagPlayIntro;
         if ((gGameOptions.uGameFlags&kGameFlagPlayIntro) && !gDemo.bPlaying && !gDemo.bRecording && !Bstrlen(gGameOptions.szUserMap))
-            levelPlayIntroScene(gGameOptions.nEpisode);
+            playCutscene(gGameOptions.nEpisode, kGameFlagPlayIntro);
 
         ///////
         if (!VanillaMode())
@@ -678,6 +678,12 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.bEnemyShuffle = false;
         gGameOptions.bPitchforkOnly = false;
         gGameOptions.uSpriteBannedFlags = gPacketStartGame.uSpriteBannedFlags;
+        //Cutscene / cinematic
+        if (gEpisodeInfo[gGameOptions.nEpisode].cutALevel == gGameOptions.nLevel
+            && gEpisodeInfo[gGameOptions.nEpisode].cutsceneASmkPath)
+            gGameOptions.uGameFlags |= 4;
+        if (gGameOptions.nGameType == 1 && (gGameOptions.uGameFlags & 4) && !gPacketStartGame.userMap)
+            playCutscene(gGameOptions.nEpisode, kGameFlagPlayIntro);
         ///////
     }
     if (gGameOptions.nGameType != kGameTypeSinglePlayer)
@@ -1295,12 +1301,13 @@ void ProcessFrame(void)
             gDemo.Close();
         sndFadeSong(4000);
         seqKillAll();
+        //Cutscene / cinematic
         if (gGameOptions.uGameFlags&kGameFlagEnding)
         {
-            if (gGameOptions.nGameType == kGameTypeSinglePlayer)
+            if (gGameOptions.nGameType == kGameTypeSinglePlayer|| gGameOptions.nGameType == kGameTypeCoop)
             {
                 if (gGameOptions.uGameFlags&kGameFlagPlayOutro)
-                    levelPlayEndScene(gGameOptions.nEpisode);
+                    playCutscene(gGameOptions.nEpisode, kGameFlagPlayOutro);
                 gGameMenuMgr.Deactivate();
                 gGameMenuMgr.Push(&menuCredits,-1);
             }

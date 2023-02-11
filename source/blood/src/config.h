@@ -148,6 +148,7 @@ extern int gSectorBehavior;
 extern int gHitscanProjectiles;
 extern int gRandomizerMode;
 extern char gzRandomizerSeed[9];
+extern int gCutScenes;
 //////
 
 int  CONFIG_ReadSetup(void);
