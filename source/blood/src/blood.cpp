@@ -2077,6 +2077,7 @@ RESTART:
     ready2send = 1;
     static bool frameJustDrawn;
     static int nGammaMenu = !gSetup.quickstart ? 0 : 40;
+    //TODO: mercury to add on the fly joining feature
     while (!gQuitGame)
     {
         bool bDraw;

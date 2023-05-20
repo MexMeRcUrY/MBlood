@@ -112,9 +112,15 @@ void _consoleSysMsg(const char* pMessage, ...);
 
 #define kCauserGame (kMaxSprites - 1)
 enum Games_t {
-    kGame_Blood = 0,
+    kGame_Blood,
     kGame_Cryptic,
-    GAMECOUNT
+    GAMESCOUNT
+};
+enum CinematicFormats {
+    SMK = 0,
+    OGV,
+    AVI, //in base game but not player supported
+    CINEMATICEXTCOUNT
 };
 
 // GAMETYPES //////////////////////////////////////////////////

@@ -101,7 +101,50 @@ char DoUnFade(int nTicks)
 
 void credLogosDos(void)
 {
-    char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
+    //TODO:
+    char* fullpath = new char[BMAX_PATH];
+    memset(fullpath, 0, MAX_PATH);
+    bool moviePlayed = false;
+    bool filefound = false;
+    char* smkMovieFullPath = new char[MAX_PATH];
+    memset(smkMovieFullPath, 0, MAX_PATH);
+    char* ogvMovieFullPath = new char[MAX_PATH];
+    memset(ogvMovieFullPath, 0, MAX_PATH);
+    EPISODEINFO* pEpisode = &gEpisodeInfo[0];
+    
+    char* rootDirMoviePath = new char[MAX_PATH];
+    char* rootDirPath = new char[MAX_PATH];
+    char* cutscenePath = new char[MAX_PATH];
+    char* cutsceneWavPath = new char[MAX_PATH];
+    int   cutsceneWavRsrcID = 0;
+    strcpy(cutscenePath,"MONOLITH.SMK");
+    CinematicFormats formatFound = CINEMATICEXTCOUNT;
+    filefound = 0;// getCutScenePathAndFormat(cutscenePath, fullpath, &formatFound);
+    if (filefound)
+    {
+        switch (formatFound)
+        {
+        case SMK:
+            strcpy(smkMovieFullPath, fullpath);
+            break;
+        case CinematicFormats::OGV:
+            strcpy(ogvMovieFullPath, fullpath);
+            break;
+        }
+
+    }
+    //try movies in game Data path
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
+    }
+
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlayTheora(ogvMovieFullPath);
+
+    }
+   /* char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
     if (bShift || !gCutScenes)
         return;
 
@@ -112,7 +155,7 @@ void credLogosDos(void)
     char* ogvMovieFullPath = new char[MAX_PATH];
     char* nBloodMovieFullPath = new char[MAX_PATH];
     char logoVideo[] = "movie\\MONOLITH.SMK";
-    getCutScenePath(logoVideo, nBloodMovieFullPath, ogvMovieFullPath, smkMovieFullPath);
+    getCutScenePath(logoVideo,CinematicFormats);
     bool moviePlayed = false;
 
     moviePlayed = credPlaySmk("LOGO.SMK", "logo811m.wav", 300);
@@ -155,7 +198,7 @@ void credLogosDos(void)
     sndStartSample("THUNDER2", 128, -1);
     sndPlaySpecialMusicOrNothing(MUS_INTRO);
     Wait(360);
-    sndFadeSong(4000);
+    sndFadeSong(4000);*/
 }
 
 void credReset(void)

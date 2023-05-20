@@ -422,7 +422,7 @@ void G_RemoveSearchPaths(const char* gamePath)
 
 char const* G_GetGamePath(Games_t game)
 {
-    const char* path = NULL;
+    const char* path;
     switch (game)
     {
     case kGame_Blood:
@@ -431,8 +431,10 @@ char const* G_GetGamePath(Games_t game)
     case kGame_Cryptic:
         path = g_BloodCrypticPath;
         break;
+    default:
+        path = g_rootDir;
     }
-
+    
     return path;
 }
 
