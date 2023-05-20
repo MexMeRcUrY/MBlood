@@ -128,8 +128,154 @@ void levelOverrideINI(const char *pzIni)
     bINIOverride = true;
     strcpy(BloodIniFile, pzIni);
 }
+///////
+//Cutscene / cinematic
+void showWaitingScreenForCoop(void)
+{
+    if (gGameOptions.nGameType == 1)
+    {
+        viewLoadingScreen(2518, "Network Game", "Playing Cinematic", "Waiting for other player(s) to skip...");
+        videoNextPage();
+        netWaitForEveryone(0);
+    }
+}
 
-void levelPlayIntroScene(int nEpisode)
+bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, CinematicFormats &formatFound) {
+    // get filename
+    char* cs = new char[strlen(episodeCutscene)];
+    strcpy(cs, episodeCutscene);
+    //uniform path in case multiplatform
+    for (int i = 0; i < strlen(cs); i++)
+    {
+        if (cs[i] == '/')
+        {
+            cs[i] = '\\';
+        }
+    }
+    //file name with extension
+    char* fileName = strrchr(cs, '\\');
+    if (fileName == NULL) return false;
+    //remove first back slash
+    if (fileName != NULL && fileName[0] == '\\')
+    {
+        memmove(&fileName[0], &fileName[0 + 1], strlen(fileName));
+    }
+    //file name without extension
+    char* lastExt;
+    lastExt = strrchr(fileName, '.');
+    if (lastExt == NULL) return false;
+    if (lastExt != NULL)
+        *lastExt = '\0';
+    //const char* mainDir = G_GetGamePath(Games_t::kGame_Blood);
+    for (int i = 0; i < 4; i++) //loop the 3 options: local path, auto load path, game dir path
+    {
+        const char* CUR_DIR;
+        switch (i)
+        {
+        case 0:
+            CUR_DIR = "./Movie/";
+            break;
+        case 1:
+            CUR_DIR = "./autoload/Movie/";
+            break;
+        case 2:
+            CUR_DIR = G_GetGamePath(Games_t::kGame_Blood);
+            break;
+        case 3:
+            char mov[MAX_PATH];
+            memset(mov, 0, MAX_PATH);
+            CUR_DIR = G_GetGamePath(Games_t::kGame_Blood);
+            strcat(mov, CUR_DIR);
+            strcat(mov, "/MOvie");
+            CUR_DIR = mov;
+            break;
+
+        }
+        //fnlist_t fnl = FNLIST_INITIALIZER;
+        //fnlist_clearnames(&fnl);
+        //fnlist_getnames(&fnl, "/", "*.ogv", 0, 0);
+        bool bkpPathsearchmode = pathsearchmode;
+        pathsearchmode = 1; // makes the klistpath only look into the passed directory.
+        BUILDVFS_FIND_REC* ogvFilesList = klistpath(CUR_DIR, "*.ogv", BUILDVFS_FIND_FILE);
+        pathsearchmode = bkpPathsearchmode;
+        pINIChain = NULL;
+        char* ogvFile = new char[strlen(fileName) + 4];
+        strcpy(ogvFile, fileName);
+        strcat(ogvFile, ".ogv");
+        for (auto pIter = ogvFilesList; pIter; pIter = pIter->next)
+        {
+            if (!Bstrncasecmp(ogvFile, pIter->name, BMAX_PATH))
+            {
+                strcat(fullPath, CUR_DIR);
+                strcat(fullPath, ogvFile);
+                formatFound = CinematicFormats::OGV;
+                return true;
+            }
+
+        }
+        BUILDVFS_FIND_REC* smkFilesList = klistpath(CUR_DIR, "*.SMK", BUILDVFS_FIND_FILE);
+
+        pINIChain = NULL;
+        char* smkFile = new char[strlen(fileName) + 4];
+        strcpy(smkFile, fileName);
+        strcat(smkFile, ".SMK");
+        for (auto pIter = smkFilesList; pIter; pIter = pIter->next)
+        {
+            if (!Bstrncasecmp(smkFile, pIter->name, BMAX_PATH))
+            {
+                strcat(fullPath, CUR_DIR);
+                strcat(fullPath, smkFile);
+                formatFound = SMK;
+                return true;
+            }
+
+        }
+    }
+    return false; 
+   // char* cutscene = new char[strlen(episodeCutscene)];
+   // strcpy(cutscene, episodeCutscene);
+   // const char *gameDir = G_GetGamePath(kGame_Blood);
+   // const char *rootGameDir = G_GetGamePath(GAMESCOUNT);
+
+   // strcpy(ogvMovieFullPath, gameDir);
+   // strcpy(smkMovieFullPath, gameDir);
+   // strcpy(rootDirMoveFullPath, rootGameDir);
+   // const char* cs = cutscene;
+   // const int last = (int) '//' ;
+   // const char* filename =  strrchr(cs, last);
+   ////get
+   // 
+   // //strip the drive letter (OUWB)
+   // char*  driveLetter = strrchr(cutscene, ':');
+   // if (driveLetter)
+   // {
+   //     size_t pathSize = strlen(driveLetter);
+   //     cutscene[0] = 0;
+   //     cutscene = new char[pathSize - 1];
+   //     memcpy(cutscene, &driveLetter[1], pathSize);
+   //     cutscene[pathSize - 1] = '\0';
+   //     strcat(smkMovieFullPath, cutscene);
+   //     strcat(ogvMovieFullPath, cutscene);
+   //     strcat(rootDirMoveFullPath, cutscene);
+
+   // }
+   // else
+   // {
+   //     strcat(smkMovieFullPath, "\\");
+   //     strcat(smkMovieFullPath, cutscene);
+   //     strcat(ogvMovieFullPath, "\\");
+   //     strcat(ogvMovieFullPath, cutscene);
+   //     strcat(rootDirMoveFullPath, "\\");
+   //     strcat(rootDirMoveFullPath, cutscene);
+
+   // }
+   // //Freshsupply files
+   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 1] = 'v';
+   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 2] = 'g';
+   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 3] = 'o';
+}
+///////
+void playCutscene(int nEpisode, int nSceneType)
 {
     gGameOptions.uGameFlags &= ~kGameFlagPlayIntro;
     sndStopSong();
@@ -137,31 +283,89 @@ void levelPlayIntroScene(int nEpisode)
     sfxKillAllSounds();
     ambKillAll();
     seqKillAll();
-    EPISODEINFO *pEpisode = &gEpisodeInfo[nEpisode];
-    credPlaySmk(pEpisode->cutsceneASmkPath, pEpisode->cutsceneAWavPath, pEpisode->cutsceneAWavRsrcID);
+///////    
+    ControlInfo info;
+    //Cutscene / cinematic
+    if (!gCutScenes)
+    {
+        scrSetDac();
+        viewResizeView(gViewSize);
+        credReset();
+        scrSetDac();
+        CONTROL_GetInput(&info); // clear mouse and all input after cutscene has finished playing
+        ctrlClearAllInput();
+        return;
+    }
+    
+    EPISODEINFO* pEpisode = &gEpisodeInfo[nEpisode];
+    char* smkMovieFullPath = new char[MAX_PATH];
+    memset(smkMovieFullPath, 0, MAX_PATH);
+    char* ogvMovieFullPath = new char[MAX_PATH];
+    memset(ogvMovieFullPath, 0, MAX_PATH);
+    char* rootDirMoviePath = new char[MAX_PATH];
+    char *rootDirPath = new char[MAX_PATH];
+    char* cutscenePath = new char[MAX_PATH];
+    char* cutsceneWavPath = new char[MAX_PATH];
+    int   cutsceneWavRsrcID =0;
+
+    switch (nSceneType)
+    {
+    case kGameFlagPlayIntro:
+        
+            cutscenePath = pEpisode->cutsceneASmkPath;
+            cutsceneWavPath = pEpisode->cutsceneAWavPath;
+            cutsceneWavRsrcID = pEpisode->cutsceneAWavRsrcID;
+            break;
+    case kGameFlagEnding:
+    case kGameFlagPlayOutro:
+        
+            cutscenePath = pEpisode->cutsceneBSmkPath;
+            cutsceneWavPath = pEpisode->cutsceneBWavPath;
+            cutsceneWavRsrcID = pEpisode->cutsceneBWavRsrcID;
+            break;
+    case kGameFlagContinuing:
+        //TODO:
+        break;
+
+    }
+    char* fullpath = new char[MAX_PATH];
+    memset(fullpath, 0, MAX_PATH);
+    CinematicFormats formatFound = CINEMATICEXTCOUNT;
+    bool moviePlayed = false;
+    bool filefound = false;
+    filefound = getCutScenePathAndFormat(cutscenePath, fullpath, formatFound);
+    if (filefound)
+    {
+        switch(formatFound)
+        {
+        case SMK:
+            strcpy(smkMovieFullPath, fullpath);
+            break;
+        case CinematicFormats::OGV:
+            strcpy(ogvMovieFullPath, fullpath);
+            break;
+        }
+        
+    }
+    //try movies in game Data path
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
+        showWaitingScreenForCoop();
+    }
+
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlayTheora(ogvMovieFullPath);
+        showWaitingScreenForCoop();
+    }
     scrSetDac();
     viewResizeView(gViewSize);
     credReset();
     scrSetDac();
-    ControlInfo info;
     CONTROL_GetInput(&info); // clear mouse and all input after cutscene has finished playing
     ctrlClearAllInput();
-}
-
-void levelPlayEndScene(int nEpisode)
-{
-    gGameOptions.uGameFlags &= ~kGameFlagPlayOutro;
-    sndStopSong();
-    sndKillAllSounds();
-    sfxKillAllSounds();
-    ambKillAll();
-    seqKillAll();
-    EPISODEINFO *pEpisode = &gEpisodeInfo[nEpisode];
-    credPlaySmk(pEpisode->cutsceneBSmkPath, pEpisode->cutsceneBWavPath, pEpisode->cutsceneBWavRsrcID);
-    scrSetDac();
-    viewResizeView(gViewSize);
-    credReset();
-    scrSetDac();
+    ///////
 }
 
 void levelClearSecrets(void)

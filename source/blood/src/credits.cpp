@@ -35,6 +35,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "screen.h"
 #include "sound.h"
 #include "view.h"
+//Cutscene / cinematic
+#include "sdltheora/sdltheora.h"
+#include <SDL_video.h>
+#include <renderlayer.h> //getwindow
 
 inline char keyJoyGetScan(void)
 {
@@ -97,16 +101,69 @@ char DoUnFade(int nTicks)
 
 void credLogosDos(void)
 {
-    char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
-    if (bShift)
+    //TODO:
+    char* fullpath = new char[BMAX_PATH];
+    memset(fullpath, 0, MAX_PATH);
+    bool moviePlayed = false;
+    bool filefound = false;
+    char* smkMovieFullPath = new char[MAX_PATH];
+    memset(smkMovieFullPath, 0, MAX_PATH);
+    char* ogvMovieFullPath = new char[MAX_PATH];
+    memset(ogvMovieFullPath, 0, MAX_PATH);
+    EPISODEINFO* pEpisode = &gEpisodeInfo[0];
+    
+    char* rootDirMoviePath = new char[MAX_PATH];
+    char* rootDirPath = new char[MAX_PATH];
+    char* cutscenePath = new char[MAX_PATH];
+    char* cutsceneWavPath = new char[MAX_PATH];
+    int   cutsceneWavRsrcID = 0;
+    strcpy(cutscenePath,"MONOLITH.SMK");
+    CinematicFormats formatFound = CINEMATICEXTCOUNT;
+    filefound = 0;// getCutScenePathAndFormat(cutscenePath, fullpath, &formatFound);
+    if (filefound)
+    {
+        switch (formatFound)
+        {
+        case SMK:
+            strcpy(smkMovieFullPath, fullpath);
+            break;
+        case CinematicFormats::OGV:
+            strcpy(ogvMovieFullPath, fullpath);
+            break;
+        }
+
+    }
+    //try movies in game Data path
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
+    }
+
+    if (!moviePlayed)
+    {
+        moviePlayed = credPlayTheora(ogvMovieFullPath);
+
+    }
+   /* char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
+    if (bShift || !gCutScenes)
         return;
 
     videoClearScreen(0);
     DoUnFade(1);
 
-    if (!credPlaySmk("LOGO.SMK", "logo811m.wav", 300) && !credPlaySmk("movie/LOGO.SMK", "movie/logo811m.wav", 300))
+    char* smkMovieFullPath = new char[MAX_PATH];
+    char* ogvMovieFullPath = new char[MAX_PATH];
+    char* nBloodMovieFullPath = new char[MAX_PATH];
+    char logoVideo[] = "movie\\MONOLITH.SMK";
+    getCutScenePath(logoVideo,CinematicFormats);
+    bool moviePlayed = false;
+
+    moviePlayed = credPlaySmk("LOGO.SMK", "logo811m.wav", 300);
+    if (!moviePlayed)
+        moviePlayed = credPlayTheora(ogvMovieFullPath);
+    if (!moviePlayed)
     {
-        rotatesprite(160<<16, 100<<16, 65536, 0, 2050, 0, 0, 0x4a, 0, 0, xdim-1, ydim-1);
+        rotatesprite(160 << 16, 100 << 16, 65536, 0, 2050, 0, 0, 0x4a, 0, 0, xdim - 1, ydim - 1);
         scrNextPage();
         sndStartSample("THUNDER2", 128, -1);
         if (Wait(360))
@@ -116,12 +173,15 @@ void credLogosDos(void)
         }
     }
 
-    if (videoGetRenderMode() == REND_CLASSIC)
-        credReset();
-
-    if (!credPlaySmk("GTI.SMK", "gti.wav", 301) && !credPlaySmk("movie/GTI.SMK", "movie/gti.wav", 301))
+    credReset();
+    char gtiVideo[] = "movie\\GTI.SMK";
+    getCutScenePath(gtiVideo, nBloodMovieFullPath, ogvMovieFullPath, smkMovieFullPath);
+    moviePlayed = credPlaySmk("GTI.SMK", "gti.wav", 301);
+    if (!moviePlayed)
+        moviePlayed = credPlayTheora(ogvMovieFullPath);
+    if (!moviePlayed)
     {
-        rotatesprite(160<<16, 100<<16, 65536, 0, 2052, 0, 0, 0x0a, 0, 0, xdim-1, ydim-1);
+        rotatesprite(160 << 16, 100 << 16, 65536, 0, 2052, 0, 0, 0x0a, 0, 0, xdim - 1, ydim - 1);
         scrNextPage();
         sndStartSample("THUNDER2", 128, -1);
         if (Wait(360))
@@ -133,12 +193,12 @@ void credLogosDos(void)
 
     credReset();
 
-    rotatesprite(160<<16, 100<<16, 65536, 0, gMenuPicnum, 0, 0, 0x4a, 0, 0, xdim-1, ydim-1);
+    rotatesprite(160 << 16, 100 << 16, 65536, 0, 2518, 0, 0, 0x4a, 0, 0, xdim - 1, ydim - 1);
     scrNextPage();
     sndStartSample("THUNDER2", 128, -1);
     sndPlaySpecialMusicOrNothing(MUS_INTRO);
     Wait(360);
-    sndFadeSong(4000);
+    sndFadeSong(4000);*/
 }
 
 void credReset(void)
@@ -318,6 +378,115 @@ char credPlaySmk(const char *_pzSMK, const char *_pzWAV, int nWav)
     Xfree(pFrame);
     Xfree(pzSMK_);
     Xfree(pzWAV_);
+
+    return TRUE;
+}
+
+char credPlayTheora(const char* ogvideo)
+{
+    struct stat buf;
+
+    if (stat(ogvideo, &buf) != 0)
+    {
+        return false;
+    }
+
+    uint32_t posX = 0, posY = 0, width = 0, height = 0;
+    HWND hWindow = win_gethwnd(); // blood main window
+    if (validmodecnt)
+    {
+        //max valid resolution
+        width = validmode[0].xdim;
+        height = validmode[0].ydim;
+    }
+    else
+    {
+        width = 640;
+        height = 480;
+    }
+    int quit = 0;
+    SDL_Event e;
+    SDL_Window* win = NULL;
+    SDL_Renderer* renderer = NULL;
+    RECT Rect;
+    GetWindowRect(hWindow, &Rect);
+    int const display = r_displayindex < SDL_GetNumVideoDisplays() ? r_displayindex : 0;
+
+    if (gSetup.fullscreen)
+    {
+        //cannot hanlde 2 windows in fullscreen. so hide main one while movie playing
+        ShowWindow(hWindow, SW_HIDE);
+        win = SDL_CreateWindow("", posX, posY, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN_DESKTOP);
+    }
+    else
+    {
+        MapWindowPoints(HWND_DESKTOP, GetParent(hWindow), (LPPOINT)&Rect, 2);
+        posX = Rect.left;
+        posY = Rect.top;
+        width = gSetup.xdim;
+        height = gSetup.ydim;
+        win = SDL_CreateWindow("", posX + 9, posY + 30, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
+
+    }
+
+    if (win == NULL)
+    {
+        return false;//SDL_GetError();
+    }
+    renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL)
+    {
+        printf("Renderer SDL Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(win);
+        win = NULL;
+    }
+    else
+    {
+        //Initialize renderer color
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    }
+
+    intptr_t my_video = THR_Load(ogvideo, renderer);
+    SDL_Texture* video_texture = THR_UpdateVideo(my_video);
+    ctrlClearAllInput();
+    while (!quit)
+    {
+
+        gameHandleEvents();
+        //Handle events on queue
+        while (SDL_PollEvent(&e) != 0)
+        {
+            //User requests quit
+            if (e.type == SDL_QUIT)
+            {
+                quit = 1;
+            }
+        }
+
+        // Use SDL_RenderCopy to blit the texture normally
+        //Clear screen
+        SDL_RenderClear(renderer);
+        //Render texture to screen
+        SDL_RenderCopy(renderer, video_texture, NULL, NULL);
+        //Update screen
+        SDL_RenderPresent(renderer);
+
+        if (THR_IsPlaying(my_video) == 0 || KB_KeyPressed(sc_Escape))
+        {
+            quit = 1;
+            THR_DestroyVideo(my_video, win);
+            THR_Quit();
+            //focus main blood window hidden in fullscreen
+            ShowWindow(hWindow, SW_SHOWNORMAL);
+            SetForegroundWindow(hWindow);
+            SetFocus(hWindow);
+            videoClearScreen(0);
+        }
+        else
+            video_texture = THR_UpdateVideo(my_video);
+
+        ctrlClearAllInput();
+    }
 
     return TRUE;
 }

@@ -168,6 +168,7 @@ int gSectorBehavior;
 int gHitscanProjectiles;
 int gRandomizerMode;
 char gzRandomizerSeed[9];
+int gCutScenes;
 /////////
 
 int32_t CONFIG_FunctionNameToNum(const char *func)
@@ -512,6 +513,7 @@ void CONFIG_SetDefaults(void)
     gPlayerTeamPreference = 0;
     gShowPlayerNames = 1;
     gShowWeapon = 2;
+    gCutScenes = 1;
 
     gMouseAimingFlipped = 0;
     gMouseAim = 1;
@@ -863,6 +865,7 @@ int CONFIG_ReadSetup(void)
     SCRIPT_GetNumber(scripthandle, "Game Options", "SectorBehavior", &gSectorBehavior);
     SCRIPT_GetNumber(scripthandle, "Game Options", "HitscanProjectiles", &gHitscanProjectiles);
     SCRIPT_GetNumber(scripthandle, "Game Options", "RandomizerMode", &gRandomizerMode);
+    SCRIPT_GetNumber(scripthandle, "Game Options", "CutScenes", &gCutScenes);
 
     Bmemset(tempbuf, 0, sizeof(tempbuf));
     Bmemset(gzRandomizerSeed, 0, sizeof(gzRandomizerSeed));
@@ -1162,6 +1165,7 @@ void CONFIG_WriteSetup(uint32_t flags)
     SCRIPT_PutNumber(scripthandle, "Game Options", "RandomizerMode", gRandomizerMode, FALSE, FALSE);
     gzRandomizerSeed[sizeof(gzRandomizerSeed)-1] = '\0';
     SCRIPT_PutString(scripthandle, "Game Options", "RandomizerSeed", &gzRandomizerSeed[0]);
+    SCRIPT_PutNumber(scripthandle, "Game Options", "CutScenes", gCutScenes, FALSE, FALSE);
     ///////
     
     SCRIPT_Save(scripthandle, SetupFilename);

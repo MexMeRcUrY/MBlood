@@ -454,6 +454,7 @@ CGameMenuItemZCycle itemNetStart12("SPAWN WITH WEAPON:", 3, 66, 135, 180, 0, 0, 
 CGameMenuItemChain itemNetStart13("USER MAP", 3, 66, 150, 320, 0, &menuMultiUserMaps, 0, NULL, 0);
 CGameMenuItemChain itemNetStart14("ENHANCEMENTS", 3, 66, 160, 320, 0, &menuNetworkGameEnhancements, -1, NULL, 0);
 CGameMenuItemChain itemNetStart15("START GAME", 1, 0, 175, 320, 1, 0, -1, StartNetGame, 0);
+CGameMenuItemZBool itemNetStart16("CUT-SCENES:", 3, 66, 150, 180, false, 0, NULL, NULL);
 
 ///////////////
 CGameMenuItemChain itemNetEnhancementBannedItems("SET ITEMS", 3, 0, 37, 320, 1, &menuBannedItems, -1, NULL, 0);
@@ -469,6 +470,7 @@ CGameMenuItemZBool itemNetEnhancementSectorBehavior("SECTOR BEHAVIOR:", 3, 66, 1
 CGameMenuItemZBool itemNetEnhancementBoolHitscanProjectiles("HITSCAN PROJECTILES:", 3, 66, 140, 180, false, NULL, NULL, NULL);
 CGameMenuItemZCycle itemNetEnhancementRandomizerMode("RANDOMIZER MODE:", 3, 66, 150, 180, 0, NULL, pzRandomizerModeStrings, ARRAY_SSIZE(pzRandomizerModeStrings), 0);
 CGameMenuItemZEdit itemNetEnhancementRandomizerSeed("RANDOMIZER SEED:", 3, 66, 160, 180, szRandomizerSeedMenu, sizeof(szRandomizerSeedMenu), 0, SetRandomizerSeed, 0);
+
 ///////////////////
 
 CGameMenuItemText itemLoadingText("LOADING...", 1, 160, 100, 1);
@@ -880,6 +882,7 @@ void UpdatePlayerSkill(CGameMenuItemZCycle *pItem);
 void UpdatePlayerTeamPreference(CGameMenuItemZCycle *pItem);
 void SetShowPlayerNames(CGameMenuItemZBool *);
 void SetShowWeapons(CGameMenuItemZCycle *);
+void SetCutScenes(CGameMenuItemZBool*);
 void UpdatePlayerChatMessageSound(CGameMenuItemZBool *pItem);
 void UpdatePlayerColorMessages(CGameMenuItemZBool *pItem);
 void UpdatePlayerKillMessage(CGameMenuItemZBool *pItem);
@@ -917,6 +920,7 @@ CGameMenuItemZCycle itemOptionsOnlineSkill("HEALTH HANDICAP:", 3, 66, 70, 180, 0
 CGameMenuItemZCycle itemOptionsOnlineTeamPreference("TEAM PREFERENCE:", 3, 66, 80, 180, 0, UpdatePlayerTeamPreference, pzPlayerTeamPreferenceStrings, ARRAY_SIZE(pzPlayerTeamPreferenceStrings), 0);
 CGameMenuItemZBool itemOptionsOnlineBoolShowPlayerNames("SHOW PLAYER NAMES:", 3, 66, 100, 180, gShowPlayerNames, SetShowPlayerNames, NULL, NULL);
 CGameMenuItemZCycle itemOptionsOnlineShowWeapons("SHOW WEAPONS:", 3, 66, 110, 180, 0, SetShowWeapons, pzShowWeaponStrings, ARRAY_SSIZE(pzShowWeaponStrings), 0);
+CGameMenuItemZBool itemOptionsGameBoolCutScenes("CUTSCENES:", 3, 66, 140, 180, gCutScenes, SetCutScenes, NULL, NULL);
 CGameMenuItemZBool itemOptionsOnlineChatSound("MESSAGE BEEP:", 3, 66, 120, 180, true, UpdatePlayerChatMessageSound, NULL, NULL);
 CGameMenuItemZBool itemOptionsOnlineColorMsg("COLORED MESSAGES:", 3, 66, 130, 180, true, UpdatePlayerColorMessages, NULL, NULL);
 CGameMenuItemZBool itemOptionsOnlineKillMsg("SHOW KILLS ON HUD:", 3, 66, 140, 180, true, UpdatePlayerKillMessage, NULL, NULL);
@@ -1301,6 +1305,7 @@ void SetupNetStartMenu(void)
     menuNetStart.Add(&itemNetStart13, false);
     menuNetStart.Add(&itemNetStart14, false);
     menuNetStart.Add(&itemNetStart15, false);
+    menuNetStart.Add(&itemNetStart16, false);
     menuMultiUserMaps.Add(&itemNetStartUserMapTitle, true);
     menuMultiUserMaps.Add(&menuMultiUserMap, true);
 
@@ -1583,6 +1588,7 @@ void SetupOptionsMenu(void)
     itemEnhancementRandomizerMode.tooltip_pzTextUpper = "Set the randomizer's mode";
     itemEnhancementRandomizerSeed.tooltip_pzTextUpper = "Set the randomizer's seed";
     itemEnhancementRandomizerSeed.tooltip_pzTextLower = "No seed = always use a random seed";
+    menuOptionsGame.Add(&itemOptionsGameBoolCutScenes, false);
     /////////////////////
 
     //menuOptionsGame.Add(&itemOptionsGameChainParentalLock, false);
@@ -1610,6 +1616,7 @@ void SetupOptionsMenu(void)
     itemEnhancementBoolHitscanProjectiles.at20 = !!gHitscanProjectiles;
     itemEnhancementRandomizerMode.m_nFocus = gRandomizerMode % ARRAY_SSIZE(pzRandomizerModeStrings);
     Bstrncpy(szRandomizerSeedMenu, gzRandomizerSeed, sizeof(szRandomizerSeedMenu));
+    itemOptionsGameBoolCutScenes.at20 = gCutScenes;
     ///////
 
     menuOptionsDisplay.Add(&itemOptionsDisplayTitle, false);
@@ -3081,6 +3088,11 @@ void UpdatePlayerTeamPreference(CGameMenuItemZCycle *pItem)
 void SetShowPlayerNames(CGameMenuItemZBool *pItem)
 {
     gShowPlayerNames = pItem->at20;
+}
+
+void SetCutScenes(CGameMenuItemZBool* pItem)
+{
+    gCutScenes = pItem->at20;
 }
 
 void SetShowWeapons(CGameMenuItemZCycle *pItem)

@@ -179,8 +179,7 @@ extern int gLevelTime;
 
 void levelInitINI(const char *pzIni);
 void levelOverrideINI(const char *pzIni);
-void levelPlayIntroScene(int nEpisode);
-void levelPlayEndScene(int nEpisode);
+void playCutscene(int nEpisode, int SceneType);
 void levelClearSecrets(void);
 void levelSetupSecret(int nCount);
 void levelTriggerSecret(int nSecret);

@@ -111,6 +111,17 @@ void _consoleSysMsg(const char* pMessage, ...);
 #define kDmgMax 7
 
 #define kCauserGame (kMaxSprites - 1)
+enum Games_t {
+    kGame_Blood,
+    kGame_Cryptic,
+    GAMESCOUNT
+};
+enum CinematicFormats {
+    SMK = 0,
+    OGV,
+    AVI, //in base game but not player supported
+    CINEMATICEXTCOUNT
+};
 
 // GAMETYPES //////////////////////////////////////////////////
 enum {
@@ -554,7 +565,9 @@ extern char *g_grpNamePtr;
 
 extern int loaddefinitions_game(const char *fn, int32_t preload);
 
+extern char const* G_GetGamePath(Games_t game);
 extern void G_AddSearchPaths(void);
+extern void G_RemoveSearchPaths(const char* gamePath);
 extern void G_CleanupSearchPaths(void);
 
 extern void G_ExtPreInit(int32_t argc, char const * const * argv);
