@@ -998,6 +998,7 @@ int32_t registerosdcommands(void)
         { "cl_interpolateweapon", "enable/disable view interpolation for drawn weapon (0: disable, 1: position, 2: position/qav animation)", (void *)&gWeaponInterpolate, CVAR_INT, 0, 2 },
         { "cl_colormsg", "enable/disable colored player names in messages", (void *)&gColorMsg, CVAR_BOOL, 0, 1 },
         { "cl_killmsg", "enable/disable kill messages", (void *)&gKillMsg, CVAR_BOOL, 0, 1 },
+        { "cl_killobituaries", "enable/disable random obituary kill messages", (void *)&gKillObituary, CVAR_BOOL, 0, 1 },
         { "cl_multikill", "enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)", (void *)&gMultiKill, CVAR_INT, 0, 2 },
         { "cl_viewhbob", "enable/disable view horizontal bobbing", (void *)&gViewHBobbing, CVAR_BOOL, 0, 1 },
         { "cl_viewvbob", "enable/disable view vertical bobbing", (void *)&gViewVBobbing, CVAR_BOOL, 0, 1 },
@@ -1012,6 +1013,7 @@ int32_t registerosdcommands(void)
         { "cl_hitscantransparent", "enable/disable transparent bullet sprites for hitscan projectiles option", (void *)&gTransparentHitscanProjectiles, CVAR_BOOL, 0, 1 },
         { "cl_particlesduration", "enable/disable extended particle duration modification (single-player only - turned off for modern maps)", (void *)&gParticlesDuration, CVAR_BOOL, 0, 1 },
 
+        { "cl_rollangle", "sets how much your screen tilts when strafing (polymost)", (void *)&gRollAngle, CVAR_INT, 0, 5 },
         { "cl_runmode", "enable/disable modernized run key operation", (void *)&gRunKeyMode, CVAR_BOOL, 0, 1 },
 //
 //        { "cl_showcoords", "show your position in the game world", (void *)&ud.coords, CVAR_INT, 0,
@@ -1062,6 +1064,7 @@ int32_t registerosdcommands(void)
 //        { "hud_scale","changes the hud scale", (void *)&ud.statusbarscale, CVAR_INT|CVAR_FUNCPTR, 36, 100 },
 //        { "hud_showmapname", "enable/disable map name display on load", (void *)&hud_showmapname, CVAR_BOOL, 0, 1 },
         { "hud_stats", "enable/disable level statistics display (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])", (void *)&gLevelStats, CVAR_INT, 0, 5 },
+        { "hud_statsautomaponly", "enable/disable showing level statistics display only on map view", (void *)&gLevelStatsOnlyOnMap, CVAR_BOOL, 0, 1 },
         { "hud_ratio", "set aspect ratio screen position for hud (0: native, 1: 4:3, 2: 16:10, 3: 16:9, 3: 21:9)", (void*)&gHudRatio, CVAR_INT, 0, 4 },
         { "hud_powerupduration", "enable/disable displaying the remaining time for power-ups (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])", (void *)&gPowerupDuration, CVAR_INT, 0, 5 },
         { "hud_powerupdurationticks", "set the tickrate divide value used for displaying the remaining time for power-ups (default: 100, realtime seconds: 120)", (void *)&gPowerupTicks, CVAR_INT, 20, 240 },

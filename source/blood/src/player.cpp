@@ -1964,12 +1964,12 @@ void ProcessInput(PLAYER *pPlayer)
         if (nSector2 == nSector)
         {
             int z2 = getflorzofslope(nSector2, x2, y2);
-            pPlayer->q16slopehoriz = interpolate(pPlayer->q16slopehoriz, fix16_from_int(z1-z2)>>3, 0x4000);
+            pPlayer->q16slopehoriz = interpolate(pPlayer->q16slopehoriz, fix16_from_int(z1-z2)>>3, 0x4000, 1);
         }
     }
     else
     {
-        pPlayer->q16slopehoriz = interpolate(pPlayer->q16slopehoriz, F16(0), 0x4000);
+        pPlayer->q16slopehoriz = interpolate(pPlayer->q16slopehoriz, F16(0), 0x4000, 1);
         if (klabs(pPlayer->q16slopehoriz) < 4)
             pPlayer->q16slopehoriz = 0;
     }
@@ -2057,14 +2057,14 @@ void playerProcess(PLAYER *pPlayer)
     }
     ProcessInput(pPlayer);
     int nSpeed = approxDist(xvel[nSprite], yvel[nSprite]);
-    pPlayer->zViewVel = interpolate(pPlayer->zViewVel, zvel[nSprite], 0x7000);
+    pPlayer->zViewVel = interpolate(pPlayer->zViewVel, zvel[nSprite], 0x7000, 1);
     int dz = pPlayer->pSprite->z-pPosture->eyeAboveZ-pPlayer->zView;
     if (dz > 0)
         pPlayer->zViewVel += mulscale16(dz<<8, 0xa000);
     else
         pPlayer->zViewVel += mulscale16(dz<<8, 0x1800);
     pPlayer->zView += pPlayer->zViewVel>>8;
-    pPlayer->zWeaponVel = interpolate(pPlayer->zWeaponVel, zvel[nSprite], 0x5000);
+    pPlayer->zWeaponVel = interpolate(pPlayer->zWeaponVel, zvel[nSprite], 0x5000, 1);
     dz = pPlayer->pSprite->z-pPosture->weaponAboveZ-pPlayer->zWeapon;
     if (dz > 0)
         pPlayer->zWeaponVel += mulscale16(dz<<8, 0x8000);
@@ -2197,7 +2197,9 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
         }
         if (gGameOptions.nGameType == kGameTypeTeams)
             gPlayerScores[pKiller->teamId]--;
-        const int nMessage = Random(5);
+        int nMessage = Random(5);
+        if (!gKillObituary) // always use generic suicide message instead of obituary
+            nMessage = 4;
         const int nSound = !bKillingSpreeStopped ? gSuicide[nMessage].nSound : gKillingSpreeSuicide.nSound;
         const char* pzMessage = !bKillingSpreeStopped ? gSuicide[nMessage].pzMessage : gKillingSpreeSuicide.pzMessage;
         if (gMe->handTime <= 0)
@@ -2206,7 +2208,7 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
                 sprintf(buffer, pzMessage, gProfile[nKiller].name);
             else if (pKiller == gMe)
                 sprintf(buffer, "You killed yourself!");
-            if (gGameOptions.nGameType != kGameTypeSinglePlayer && nSound >= 0 && pKiller == gMe)
+            if ((gGameOptions.nGameType != kGameTypeSinglePlayer) && (nSound >= 0) && (pKiller == gMe) && gKillObituary)
                 sndStartSample(nSound, 255, 2, 0);
         }
     }
@@ -2269,11 +2271,13 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
             }
             gMultiKillsTicks[nKiller] = gFrameClock;
         }
-        const int nMessage = Random(25);
+        int nMessage = Random(25);
+        if (!gKillObituary) // always use generic kill message instead of obituary
+            nMessage = 10;
         const int nSound = !bKillingSpreeStopped ? gVictory[nMessage].nSound : gKillingSpreeFrag.nSound;
         const char* pzMessage = !bKillingSpreeStopped ? gVictory[nMessage].pzMessage : gKillingSpreeFrag.pzMessage;
         sprintf(buffer, pzMessage, gProfile[nKiller].name, gProfile[nVictim].name);
-        if (gGameOptions.nGameType != kGameTypeSinglePlayer && nSound >= 0 && pKiller == gMe)
+        if ((gGameOptions.nGameType != kGameTypeSinglePlayer) && (nSound >= 0) && (pKiller == gMe) && gKillObituary)
             sndStartSample(nSound, 255, 2, 0);
     }
     int nPal1 = 0, nPal2 = 0;
@@ -2655,8 +2659,9 @@ void PlayerSurvive(int, int nXSprite)
                 viewSetMessage("I LIVE...AGAIN!!");
             else
             {
-                sprintf(buffer, "%s lives again!", gProfile[pPlayer->nPlayer].name);
-                viewSetMessage(buffer);
+                int nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(pPlayer->teamId) : 0;
+                sprintf(buffer, "\r%s\r lives again!", gProfile[pPlayer->nPlayer].name);
+                viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, 0);
             }
             pPlayer->input.newWeapon = kWeaponPitchfork;
         }

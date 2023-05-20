@@ -90,6 +90,7 @@ int32_t gAutoRun;
 int32_t gCalebTalk;
 int32_t gChatSnd;
 int32_t gColorMsg;
+int32_t gKillObituary;
 int32_t gKillMsg;
 int32_t gMultiKill;
 int32_t gViewInterpolate;
@@ -109,8 +110,6 @@ int32_t gMessageState;
 int32_t gMessageCount;
 int32_t gMessageTime;
 int32_t gMessageFont;
-int32_t gbAdultContent;
-char gzAdultPassword[9];
 int32_t gStereo;
 int32_t gPlayerTeamPreference;
 int32_t gShowPlayerNames;
@@ -129,6 +128,7 @@ bool gFullMap;
 int32_t gUpscaleFactor;
 int32_t gRenderScale;
 int32_t gLevelStats;
+int32_t gLevelStatsOnlyOnMap;
 int32_t gHudRatio;
 int32_t gHudBgNewBorder;
 int32_t gHudBgScale;
@@ -138,6 +138,7 @@ int32_t gPowerupTicks;
 int32_t gShowCompleteTime;
 int32_t gShowMapTitle;
 int32_t gFov;
+int32_t gRollAngle;
 int32_t gCenterHoriz;
 int32_t gDeliriumBlur;
 int32_t gShowWeaponSelect;
@@ -408,7 +409,7 @@ void CONFIG_SetDefaults(void)
     SoundToggle     = 1;
     CDAudioToggle = 0;
     DopplerToggle = 1;
-    MusicDevice = ASS_OPL3;
+    MusicDevice = ASS_SF2;
     Bstrcpy(SF2_BankFile, "notblood.sf2");
     gFMPianoFix = 1;
     //ud.config.VoiceToggle     = 5;  // bitfield, 1 = local, 2 = dummy, 4 = other players in DM
@@ -425,6 +426,7 @@ void CONFIG_SetDefaults(void)
     //ud.hudontop               = 0;
     //ud.idplayers              = 1;
     gLevelStats = 0;
+    gLevelStatsOnlyOnMap = 0;
     gHudRatio = 1;
     gHudBgNewBorder = 1;
     gHudBgScale = 1;
@@ -477,6 +479,7 @@ void CONFIG_SetDefaults(void)
     //ud.weaponsway             = 1;
     //ud.weaponswitch           = 3;  // new+empty
     gFov = 90;
+    gRollAngle = 0;
     gCenterHoriz = 1;
     gDeliriumBlur = 1;
     gViewSize = 2;
@@ -488,6 +491,7 @@ void CONFIG_SetDefaults(void)
     gCalebTalk = 0;
     gChatSnd = 1;
     gColorMsg = 1;
+    gKillObituary = 1;
     gKillMsg = 1;
     gMultiKill = 2;
     gViewInterpolate = 1;
@@ -507,8 +511,6 @@ void CONFIG_SetDefaults(void)
     gMessageCount = 4;
     gMessageTime = 5;
     gMessageFont = 0;
-    gbAdultContent = 0;
-    gzAdultPassword[0] = '\0';
     gStereo = 1;
     gPlayerTeamPreference = 0;
     gShowPlayerNames = 1;

@@ -41,7 +41,7 @@ extern int g_useCwd;
 #define BLOODWIDESCREENDEF "blood_widescreen.def"
 #define NOTBLOODDEF "notblood.def"
 
-#define BYTEVERSION 118
+#define BYTEVERSION 120
 #define EXEVERSION 101
 
 void _SetErrorLoc(const char *pzFile, int nLine);
@@ -374,7 +374,7 @@ enum {
     kDudeBurningTinyCaleb = 252,
     kDudeBurningBeast = 253,
     kDudeVanillaMax = 254,
-    kDudeMax = 256,
+    kDudeMax,
     
     kMissileBase = 300,
     kMissileButcherKnife = kMissileBase,
@@ -490,8 +490,10 @@ kAiStateSearch          =  3,
 kAiStateChase           =  4,
 kAiStateRecoil          =  5,
 kAiStateAttack          =  6,
+kAiStateKnockout,
+kAiStateIdleSleep,
 #ifdef NOONE_EXTENSIONS
-kAiStatePatrolBase      =  7,
+kAiStatePatrolBase,
 kAiStatePatrolWaitL     =  kAiStatePatrolBase,
 kAiStatePatrolWaitC,
 kAiStatePatrolWaitW,
@@ -686,6 +688,20 @@ inline int ksgnf(float f)
     return 0;
 }
 
+inline int IncRotate(int n, int mod)
+{
+    if (++n >= mod)
+        n = 0;
+    return n;
+}
+
+inline int DecRotate(int n, int mod)
+{
+    if (--n < 0)
+        n += mod;
+    return n;
+}
+
 inline int IncBy(int a, int b)
 {
     a += b;
@@ -761,9 +777,14 @@ inline float ClipRangeF(float a, float b, float c)
     return a;
 }
 
-inline int interpolate(int a, int b, int c)
+inline int interpolate(int a, int b, int c, char bOrigCal = 0)
 {
-    return a+mulscale16(b-a,c);
+    extern bool VanillaMode(const bool bDemoCheck = false);
+    if (bOrigCal || VanillaMode())
+        return a+mulscale16(b-a,c);
+    float result = (float)b - (float)a;
+    result = (float)a + (result * (float)c / 65536.0f);
+    return (int)result;
 }
 
 inline int interpolateang(int a, int b, int c)

@@ -26,7 +26,7 @@ A gameplay modification of Blood, based upon the EDuke32 driven Blood reverse-en
 * Adjustable spawn protection
 * UT99 style multi kill alerts
 
-### Enhancements (Optional)
+### Mutators (Optional)
 * Replaced sector based damage logic for player explosions
 * Difficulty based invulnerability timer for player damage
 * Raymarching collision testing for player projectiles
@@ -79,7 +79,7 @@ This feature sets the game to match v1.21 DOS compatibility, and removes any bug
 The vanilla mode option can be found within game settings, and is only available for single-player
 It should be noted that vanilla mode does not work with modern maps
 
-### Enhancements Options
+### Mutator Options
 * Replace guns akimbo with quad damage
    - Replaces the guns akimbo powerup with Quake's quad damage (lasts 22 seconds)
 * Player damage invulnerability
@@ -143,7 +143,7 @@ It should be noted that vanilla mode does not work with modern maps
 * Hitscan projectiles
    - Makes enemies that use hitscan bullets spawn physical sprite based bullets with travel time
    - Projectile speed is adjusted depending on difficulty and if bullet is underwater
-   - This enhancement does not support custom modern map enemies
+   - This mutator does not support custom modern map enemies
 * Randomizer mode
    - Set the enemy/pickups randomizer mode
    - The randomizer does not support custom modern map enemies
@@ -189,10 +189,14 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable colored player names in messages
 * cl_killmsg
    - Enable/disable kill messages
+* cl_killobituaries
+   - Enable/disable random obituary kill messages
 * cl_multikill
    - Enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)
 * cl_weaponhbob
    - Enable/disable view horizontal bobbing
+* cl_rollangle
+   - Sets how much your screen tilts when strafing (polymost only)
 * cl_slopecrosshair
    - Enable/disable adjusting crosshair position for slope tilting
 * cl_slowroomflicker
@@ -221,6 +225,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable hud vanilla background image override (0: default, 1: use new tile, 2: use original tile)
 * hud_stats
    - Set aspect ratio screen position for hud (0: native, 1: 4:3, 2: 16:10, 3: 16:9, 3: 21:9)
+* hud_statsautomaponly
+   - Enable/disable showing level statistics display only on map view
 * hud_ratio
    - Enable/disable level statistics display (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])
 * hud_powerupdurationticks
