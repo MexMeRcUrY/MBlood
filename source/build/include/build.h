@@ -158,6 +158,7 @@ enum rendmode_t {
 # endif
 
 int32_t get_alwaysshowgray(void);  // editor only
+int32_t get_skipgraysectors(void);
 void yax_updategrays(int32_t posze);
 
 #ifdef YAX_ENABLE
@@ -212,8 +213,8 @@ static FORCE_INLINE CONSTEXPR int32_t yax_waltosecmask(int32_t const walclipmask
 void yax_preparedrawrooms(void);
 void yax_drawrooms(void (*SpriteAnimFunc)(int32_t,int32_t,int32_t,int32_t,int32_t),
                    int16_t sectnum, int32_t didmirror, int32_t smoothr);
-# define YAX_SKIPSECTOR(i) if (graysectbitmap[(i)>>3]&pow2char[(i)&7]) continue
-# define YAX_SKIPWALL(i) if (graywallbitmap[(i)>>3]&pow2char[(i)&7]) continue
+# define YAX_SKIPSECTOR(i) if (bitmap_test(graysectbitmap, (i))) continue
+# define YAX_SKIPWALL(i) if (bitmap_test(graywallbitmap, (i))) continue
 #else
 # define yax_preparedrawrooms()
 # define yax_drawrooms(SpriteAnimFunc, sectnum, didmirror, smoothr)
@@ -611,6 +612,7 @@ extern usermaphack_t g_loadedMapHack;
 extern int compare_usermaphacks(const void *, const void *);
 extern usermaphack_t *usermaphacks;
 extern int32_t num_usermaphacks;
+extern usermaphack_t *find_usermaphack();
 
 #if !defined DEBUG_MAIN_ARRAYS
 EXTERN spriteext_t *spriteext;
@@ -755,7 +757,7 @@ static inline void spriteSetSlope(uint16_t const spritenum, int16_t const heinum
 
 static inline int16_t spriteGetSlope(uint16_t const spritenum)
 {
-    auto const spr = &sprite[spritenum];
+    auto const spr = (uspriteptr_t)&sprite[spritenum];
     uint16_t const cstat = spr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK;
     if (cstat != CSTAT_SPRITE_ALIGNMENT_SLOPE)
         return 0;
@@ -993,15 +995,15 @@ EXTERN bool g_windowPosValid;
     //bit-mapped.
     //If you want draw2dscreen() to show sprite #54 then you say:
     //   spritenum = 54;
-    //   show2dsprite[spritenum>>3] |= (1<<(spritenum&7));
+    //   bitmap_set(show2dsprite, spritenum);
     //And if you want draw2dscreen() to not show sprite #54 then you say:
     //   spritenum = 54;
-    //   show2dsprite[spritenum>>3] &= ~(1<<(spritenum&7));
+    //   bitmap_clear(show2dsprite, spritenum);
 
 EXTERN int automapping;
-EXTERN char show2dsector[(MAXSECTORS+7)>>3];
-EXTERN char show2dwall[(MAXWALLS+7)>>3];
-EXTERN char show2dsprite[(MAXSPRITES+7)>>3];
+EXTERN char show2dsector[bitmap_size(MAXSECTORS)];
+EXTERN char show2dwall[bitmap_size(MAXWALLS)];
+EXTERN char show2dsprite[bitmap_size(MAXSPRITES)];
 
 struct classicht_t
 {
@@ -1020,20 +1022,20 @@ EXTERN classicht_t classicht[MAXTILES];
 # define GOTPIC_USED
 #endif
 
-EXTERN char GOTPIC_USED gotpic[(MAXTILES+7)>>3];
-EXTERN char gotsector[(MAXSECTORS+7)>>3];
+EXTERN char GOTPIC_USED gotpic[bitmap_size(MAXTILES)];
+EXTERN char gotsector[bitmap_size(MAXSECTORS)];
 
 EXTERN char editorcolors[256];
 EXTERN char editorcolorsdef[256];
 
-EXTERN char faketile[(MAXTILES+7)>>3];
+EXTERN char faketile[bitmap_size(MAXTILES)];
 EXTERN char *faketiledata[MAXTILES];
 EXTERN int faketilesize[MAXTILES];
 
 EXTERN char spritecol2d[MAXTILES][2];
 EXTERN uint8_t tilecols[MAXTILES];
 
-EXTERN char editwall[(MAXWALLS+7)>>3];
+EXTERN char editwall[bitmap_size(MAXWALLS)];
 
 extern uint8_t vgapal16[4*256];
 
@@ -1836,15 +1838,15 @@ static inline int16_t tspriteGetSlope(tspriteptr_t const tspr)
     return uint8_t(tspr->xoffset) + (uint8_t(tspr->yoffset) << 8);
 }
 
-static inline int32_t spriteGetZOfSlope(uint16_t const spritenum, int32_t dax, int32_t day)
+static inline int32_t spriteGetZOfSlope(uint16_t const spritenum, vec2_t pos)
 {
-    auto const spr = &sprite[spritenum];
+    auto const spr = (uspriteptr_t)&sprite[spritenum];
     int16_t const heinum = spriteGetSlope(spritenum);
     if (heinum == 0)
         return spr->z;
 
-    int const j = dmulscale4(sintable[(spr->ang+1024)&2047], day-spr->y,
-                            -sintable[(spr->ang+512)&2047], dax-spr->x);
+    int const j = dmulscale4(sintable[(spr->ang+1024)&2047], pos.y-spr->y,
+                            -sintable[(spr->ang+512)&2047], pos.x-spr->x);
     return spr->z + mulscale18(heinum,j);
 }
 

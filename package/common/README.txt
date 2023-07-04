@@ -127,6 +127,7 @@ It should be noted that vanilla mode does not work with modern maps
    - Fixes room over room sector handling with hitscan calculations
    - Allow hitscan weapons to be fired when floating above water
    - Prevent missiles from colliding with water surface sectors
+   - Fix water/blood droplets transitioning through underwater (e.g: the cave secret in CP01.MAP)
    - Fixes blood splatter not using closest sector
    - Improves FX sprite handling regarding room over room transitioning
    - Check wall collision for spent bullet casings movement
@@ -197,6 +198,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable view horizontal bobbing
 * cl_rollangle
    - Sets how much your screen tilts when strafing (polymost only)
+* cl_showloadsavebackdrop
+   - Enable/disable the menu backdrop for loading/saving game
 * cl_slopecrosshair
    - Enable/disable adjusting crosshair position for slope tilting
 * cl_slowroomflicker
@@ -251,6 +254,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Toggles crouch button (0:hold, 1:toggle)
 * in_turnsensitivity
    - Keyboard turning sensitivity multiplier (default: 92, range: 64-128)
+* in_turnacceleration
+   - Set keyboard turning acceleration (0: off, 1: only when running, 2: always on)
 * notarget
    - Toggles AI player detection
 * r_drawinvisiblesprites
@@ -274,8 +279,18 @@ It should be noted that vanilla mode does not work with modern maps
    - Changes the skill handicap for multiplayer (default: 2, range: 0-4)
 * snd_earangle
    - Set the listening ear offset (15-90 degrees)
+* snd_ding
+   - Enable/disable hit noise when damaging an enemy. The sound can be changed by replacing the 'notblood.pk3/HITSOUND.RAW' file
+* snd_dingvol
+   - Set volume for hit sound (default: 75, range: 1-255)
+* snd_dingminfreq
+   - Set min damage frequency for hit sound (default: 22050, range: 11025-44100)
+* snd_dingmaxfreq
+   - Set max damage frequency for hit sound (default: 22050, range: 11025-44100)
 * snd_speed
    - Set the speed of sound m/s used for doppler calculation (default: 343, range: 10-1000)
+* snd_occlusion
+   - Enable/disable lowering sound volume by 50% for occluded sound sources
 * snd_underwaterpitch
    - Enable/disable lowering sound pitch by 7% while underwater
 * team

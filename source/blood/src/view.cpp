@@ -123,12 +123,12 @@ VIEW predictFifo[256];
 
 int gInterpolate;
 int nInterpolations;
-char gInterpolateSprite[(kMaxSprites+7)>>3];
-char gInterpolateWall[(kMaxWalls+7)>>3];
-char gInterpolateSector[(kMaxSectors+7)>>3];
-char gInterpolatePanningWall[(kMaxWalls+7)>>3];
-char gInterpolatePanningCeiling[(kMaxSectors+7)>>3];
-char gInterpolatePanningFloor[(kMaxSectors+7)>>3];
+char gInterpolateSprite[bitmap_size(kMaxSprites)];
+char gInterpolateWall[bitmap_size(kMaxWalls)];
+char gInterpolateSector[bitmap_size(kMaxSectors)];
+char gInterpolatePanningWall[bitmap_size(kMaxWalls)];
+char gInterpolatePanningCeiling[bitmap_size(kMaxSectors)];
+char gInterpolatePanningFloor[bitmap_size(kMaxSectors)];
 
 #define kMaxInterpolations (16384*2)
 #define kMaxInterpolationsVanilla 4096
@@ -139,7 +139,7 @@ int gViewXCenter, gViewYCenter;
 int gViewX0, gViewY0, gViewX1, gViewY1;
 int gViewX0S, gViewY0S, gViewX1S, gViewY1S;
 int xscale, xscalecorrect, yscale, xstep, ystep;
-int xscalehud = 0, xscalestats = 0, xscalepowerups = 0, xscalectfhud = 0;
+int xscalehud = 0, xscalestats = 0, yscalestats = 0, xscalepowerups = 0, xscalectfhud = 0;
 
 int gScreenTilt;
 
@@ -423,7 +423,12 @@ void fakeProcessInput(PLAYER *pPlayer, GINPUT *pInput)
         }
     }
     if (pInput->q16turn)
-        predict.at30 = (predict.at30+pInput->q16turn)&0x7ffffff;
+    {
+        if (VanillaMode())
+            predict.at30 = ((predict.at30&0x7ff0000)+(pInput->q16turn&0x7ff0000))&0x7ffffff;
+        else
+            predict.at30 = (predict.at30+pInput->q16turn)&0x7ffffff;
+    }
     if (pInput->keyFlags.spin180)
         if (!predict.at4c)
             predict.at4c = -kAng180;
@@ -1003,7 +1008,7 @@ void viewAddInterpolation(void *data, INTERPOLATE_TYPE type)
     }
     else if (!bInterpWarnVanilla && (nInterpolations >= kMaxInterpolationsVanilla) && VanillaMode())
     {
-        OSD_Printf("Warning: Interpolations over vanilla limit (%d/%d)\n", nInterpolations, kMaxInterpolationsVanilla);
+        viewSetSystemMessage("Warning: Interpolations over vanilla limit (%d/%d)\n", nInterpolations, kMaxInterpolationsVanilla);
         bInterpWarnVanilla = 1;
     }
     INTERPOLATE *pInterpolate = &gInterpolation[nInterpolations++];
@@ -1289,6 +1294,23 @@ struct WEAPONICON {
 WEAPONICON gWeaponIcon[] = {
     { -1, 0 },
     { -1, 0 }, // 1: pitchfork
+    { 524, 4 }, // 2: flare gun
+    { 559, 7 }, // 3: shotgun
+    { 558, 5 }, // 4: tommy gun
+    { 526, 11 }, // 5: napalm launcher
+    { 589, 7 }, // 6: dynamite
+    { 618, 6 }, // 7: spray can
+    { 539, 11 }, // 8: tesla gun
+    { 800, 0 }, // 9: life leech
+    { 525, 13 }, // 10: voodoo doll
+    { 811, 7 }, // 11: proxy bomb
+    { 810, 7 }, // 12: remote bomb
+    { -1, 0 },
+};
+
+WEAPONICON gWeaponIconVoxel[] = {
+    { -1, 0 },
+    { -1, 0 }, // 1: pitchfork
     { 524, 6 }, // 2: flare gun
     { 559, 6 }, // 3: shotgun
     { 558, 8 }, // 4: tommy gun
@@ -1346,8 +1368,8 @@ void viewDrawStats(PLAYER *pPlayer, int x, int y)
     if (gGameOptions.nGameType <= kGameTypeCoop) // only show secrets counter for single-player/co-op mode
     {
         y += nHeight+1;
-        sprintf(buffer, "S:%d/%d", gSecretMgr.nNormalSecretsFound, max(gSecretMgr.nNormalSecretsFound, gSecretMgr.nAllSecrets)); // if we found more than there are, increase the total - some levels have a bugged counter
-        if (gSecretMgr.nAllSecrets && (gSecretMgr.nNormalSecretsFound >= gSecretMgr.nAllSecrets)) // if all secrets found, set counter to gold
+        sprintf(buffer, "S:%d/%d", gSecretMgr.nNormalSecretsFound, VanillaMode() ? gSecretMgr.nAllSecrets : max(gSecretMgr.nNormalSecretsFound, gSecretMgr.nAllSecrets)); // if we found more than there are, increase the total - some levels have a bugged counter
+        if (gSecretMgr.nNormalSecretsFound && (gSecretMgr.nNormalSecretsFound >= gSecretMgr.nAllSecrets)) // if all secrets found, set counter to gold
             colorStrSecrets.nColor2[0] = 2; // set valid start position for gold color
         viewDrawText(3, buffer, x, y, 20, 0, 0, true, 256, 0, &colorStrSecrets);
     }
@@ -2232,7 +2254,7 @@ void UpdateStatusBar(ClockTicks arg)
         {
             TileHGauge(2260, 124, 175, nThrowPower, 65536);
         }
-        viewDrawStats(pPlayer, 2-xscalestats, 140);
+        viewDrawStats(pPlayer, 2-xscalestats, 140-yscalestats);
         viewDrawPowerUps(pPlayer);
     }
 
@@ -2358,7 +2380,7 @@ void viewInit(void)
         dword_172CE0[i][1] = mulscale16(wrand(), 2048);
         dword_172CE0[i][2] = mulscale16(wrand(), 2048);
     }
-    gViewMap.sub_25C38(0, 0, gZoom, 0, gFollowMap);
+    gViewMap.Init(0, 0, gZoom, 0, gFollowMap);
 
     g_frameDelay = calcFrameDelay(r_maxfps);
 
@@ -2380,14 +2402,25 @@ inline int viewCalculateOffetRatio(int nRatio)
 
 void viewUpdateHudRatio(void)
 {
-    xscalehud = xscalestats = xscalepowerups = 0;
+    const char bFullHud = (gViewSize > 3);
+    xscalehud = xscalestats = yscalestats = xscalepowerups = 0;
+
     if (gHudRatio > 0)
-       xscalehud = viewCalculateOffetRatio(gHudRatio-1);
+        xscalehud = viewCalculateOffetRatio(gHudRatio-1);
     if (gLevelStats > 1)
-       xscalestats = viewCalculateOffetRatio(gLevelStats-2);
+        xscalestats = viewCalculateOffetRatio(gLevelStats-2);
+    if (gLevelStats && bFullHud) // calculate level stats y position for full hud
+    {
+        const int kScreenRatio = scale(320, xscale, yscale);
+        if ((gLevelStats == 2) || (kScreenRatio <= 300)) // adjust level stats y pos when resolution ratio is less than 16:10
+            yscalestats = 30;
+        else if ((gLevelStats == 3) || (kScreenRatio <= 330)) // adjust level stats y pos when resolution ratio is less than 16:10
+            yscalestats = 10;
+    }
     if (gPowerupDuration > 1)
-       xscalepowerups = viewCalculateOffetRatio(gPowerupDuration-2);
-    gPlayerMsg.xoffset = gGameMessageMgr.xoffset = (gViewSize < 6) ? xscalehud : 0;
+        xscalepowerups = viewCalculateOffetRatio(gPowerupDuration-2);
+
+    gPlayerMsg.xoffset = gGameMessageMgr.xoffset = gViewMap.xoffset = (gViewSize < 6) ? xscalehud : 0;
 
     if (gPowerupDuration)
         xscalectfhud = xscalepowerups;
@@ -3003,17 +3036,21 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
         pNSprite->x = pTSprite->x;
         pNSprite->y = pTSprite->y;
         pNSprite->z = pTSprite->z-(32<<8);
-        pNSprite->z -= weaponIcon.zOffset<<8; // offset up
-        if (pPlayer->posture == kPostureCrouch) // if player is crouching
+        if (!VanillaMode() && (pPlayer->posture == kPostureCrouch)) // if player is crouching
             pNSprite->z += pPlayer->pPosture[pPlayer->lifeMode][pPlayer->posture].zOffset<<5;
         pNSprite->picnum = nTile;
         pNSprite->shade = pTSprite->shade;
         pNSprite->xrepeat = 32;
         pNSprite->yrepeat = 32;
         pNSprite->ang = (gCameraAng + kAng90) & kAngMask; // always face viewer
+        if (VanillaMode())
+            break;
         const int nVoxel = voxelIndex[nTile];
         if ((pPlayer == gView) && (gViewPos != VIEWPOS_0)) // if viewing current player in third person, set sprite to transparent
+        {
             pNSprite->cstat |= CSTAT_SPRITE_TRANSLUCENT;
+            pNSprite->z -= weaponIcon.zOffset<<8; // offset up
+        }
         else if (gShowWeapon == 2 && usevoxels && gDetail >= 4 && videoGetRenderMode() != REND_POLYMER && nVoxel != -1)
         {
             pNSprite->cstat |= 48;
@@ -3028,7 +3065,10 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
                 pNSprite->ang = (gCameraAng + kAng180) & kAngMask;
             else if ((pPlayer->curWeapon == kWeaponProxyTNT) || (pPlayer->curWeapon == kWeaponRemoteTNT)) // make proxy/remote tnt always face viewers like sprite
                 pNSprite->ang = (gCameraAng + kAng180 + kAng45) & kAngMask;
+            pNSprite->z -= gWeaponIconVoxel[pPlayer->curWeapon].zOffset<<8; // offset up
         }
+        else
+            pNSprite->z -= weaponIcon.zOffset<<8; // offset up
         break;
     }
     }
@@ -4701,7 +4741,7 @@ RORHACK:
     }
     if (gViewMode == 4)
     {
-        gViewMap.sub_25DB0(gView->pSprite);
+        gViewMap.Process(gView->pSprite);
     }
     viewDrawInterface(delta);
     int zn = ((gView->zWeapon-gView->zView-(12<<8))>>7)+220;
@@ -4974,8 +5014,8 @@ void viewPrintFPS(void)
     static int32_t frameCount;
     static double cumulativeFrameDelay;
     static double lastFrameTime;
-    static float lastFPS, minFPS = 999.0f, maxFPS;
-    static double minGameUpdate = 999.0, maxGameUpdate;
+    static float lastFPS, minFPS = std::numeric_limits<float>::max(), maxFPS;
+    static double minGameUpdate = std::numeric_limits<double>::max(), maxGameUpdate;
 
     double frameTime = timerGetFractionalTicks();
     double frameDelay = frameTime - lastFrameTime;

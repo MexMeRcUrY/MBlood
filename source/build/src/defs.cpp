@@ -1433,7 +1433,7 @@ static int32_t defsparser(scriptfile *script)
             char *modelend, *modelfn;
             double scale=1.0, mzadd=0.0, myoffset=0.0;
             int32_t shadeoffs=0, pal=0, flags=0;
-            uint8_t usedframebitmap[(1024+7)>>3];
+            uint8_t usedframebitmap[bitmap_size(1024)];
 
             int32_t model_ok = 1;
 
@@ -1568,7 +1568,7 @@ static int32_t defsparser(scriptfile *script)
                             break;
                         default:
                             if (framei >= 0 && framei<1024)
-                                usedframebitmap[framei>>3] |= pow2char[framei&7];
+                                bitmap_set(usedframebitmap, framei);
                         }
 
                         model_ok &= happy;
@@ -1990,7 +1990,8 @@ static int32_t defsparser(scriptfile *script)
 
                 case T_ROTATE:
                     voxrotate[lastvoxid>>3] |= pow2char[lastvoxid&7];
-                
+                    break;
+
                 case T_NOTRANS:
                     voxflags[lastvoxid] |= VF_NOTRANS;
                     break;

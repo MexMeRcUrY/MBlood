@@ -6,7 +6,7 @@
 #define FASTPALRGBDIST (FASTPALCOLDEPTH*2+1)
 static int32_t rdist[FASTPALRGBDIST], gdist[FASTPALRGBDIST], bdist[FASTPALRGBDIST];
 #define FASTPALGRIDSIZ (FASTPALCOLDEPTH>>FASTPALRIGHTSHIFT)
-static char colhere[((FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)+7)>>3];
+static char colhere[bitmap_size((FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2))];
 static char colhead[(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)];
 static int32_t colnext[256];
 #define FASTPALCOLDIST (1<<FASTPALRIGHTSHIFT)
@@ -15,8 +15,6 @@ static uint8_t coldist[FASTPALCOLDIST];
 static int32_t colscan[27];
 
 static uint8_t const * colmatch_palette;
-
-#define pow2char(x) (1u << (x))
 
 //
 // paletteInitClosestColor

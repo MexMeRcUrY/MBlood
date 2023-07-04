@@ -799,6 +799,59 @@ void playerSpawnWeapon(PLAYER* pPlayer, int nSpawnWeapon)
     }
 }
 
+struct RESTOREITEMINFO {
+    int hasWeapon[kWeaponMax];
+    int ammoCount[12];
+    int packCurAmount[kPackMax];
+    int pwUpTime[4];
+    int armorCur[3];
+    int packId;
+};
+
+static RESTOREITEMINFO restoreInfo[kMaxPlayers];
+
+inline void playerBackupItems(PLAYER* pPlayer)
+{
+    if ((gGameOptions.nGameType != kGameTypeCoop) || !gGameOptions.bItemWeaponSettings) // don't backup item/weapon info for non-coop mode/if restore items is off
+        return;
+
+    RESTOREITEMINFO *pRestoreInfo = &restoreInfo[pPlayer->nPlayer];
+    for (int i = 0; i < kWeaponMax; i++)
+        pRestoreInfo->hasWeapon[i] = pPlayer->hasWeapon[i];
+    for (int i = 0; i < 12; i++)
+        pRestoreInfo->ammoCount[i] = pPlayer->ammoCount[i];
+    for (int i = 0; i < kPackMax; i++)
+        pRestoreInfo->packCurAmount[i] = pPlayer->packSlots[i].curAmount;
+    pRestoreInfo->pwUpTime[0] = pPlayer->pwUpTime[kPwUpDivingSuit];
+    pRestoreInfo->pwUpTime[1] = pPlayer->pwUpTime[kPwUpCrystalBall];
+    pRestoreInfo->pwUpTime[2] = pPlayer->pwUpTime[kPwUpBeastVision];
+    pRestoreInfo->pwUpTime[3] = pPlayer->pwUpTime[kPwUpJumpBoots];
+    pRestoreInfo->packId = pPlayer->packItemId;
+    for (int i = 0; i < 3; i++)
+        pRestoreInfo->armorCur[i] = pPlayer->armor[i];
+}
+
+inline void playerRestoreItems(PLAYER* pPlayer)
+{
+    if ((gGameOptions.nGameType != kGameTypeCoop) || !gGameOptions.bItemWeaponSettings) // don't restore item/weapon info for non-coop mode/if restore items is off
+        return;
+
+    RESTOREITEMINFO *pRestoreInfo = &restoreInfo[pPlayer->nPlayer];
+    for (int i = 0; i < kWeaponMax; i++)
+        pPlayer->hasWeapon[i] = pRestoreInfo->hasWeapon[i];
+    for (int i = 0; i < 12; i++)
+        pPlayer->ammoCount[i] = pRestoreInfo->ammoCount[i];
+    for (int i = 0; i < kPackMax; i++)
+        pPlayer->packSlots[i].curAmount = pRestoreInfo->packCurAmount[i];
+    pPlayer->pwUpTime[kPwUpDivingSuit] = pRestoreInfo->pwUpTime[0];
+    pPlayer->pwUpTime[kPwUpCrystalBall] = pRestoreInfo->pwUpTime[1];
+    pPlayer->pwUpTime[kPwUpBeastVision] = pRestoreInfo->pwUpTime[2];
+    pPlayer->pwUpTime[kPwUpJumpBoots] = pRestoreInfo->pwUpTime[3];
+    pPlayer->packItemId = pRestoreInfo->packId;
+    for (int i = 0; i < 3; i++)
+        pPlayer->armor[i] = pRestoreInfo->armorCur[i];
+}
+
 void playerResetPosture(PLAYER* pPlayer) {
     memcpy(pPlayer->pPosture, gPostureDefaults, sizeof(gPostureDefaults));
     if (!VanillaMode()) {
@@ -1084,6 +1137,8 @@ void playerStart(int nPlayer, int bNewLevel)
         playerResetKillMsg();
     if (bNewLevel || (nPlayer == gAnnounceKillingSpreePlayer))
         playerResetAnnounceKillingSpree();
+    if (bNewLevel)
+        playerBackupItems(pPlayer);
 }
 
 void playerReset(PLAYER *pPlayer)
@@ -1683,12 +1738,13 @@ void ProcessInput(PLAYER *pPlayer)
                 actPostSprite(pPlayer->nSprite, kStatThing);
                 seqSpawn(pPlayer->pDudeInfo->seqStartID+15, 3, pPlayer->pSprite->extra, -1);
                 playerReset(pPlayer);
+                playerRestoreItems(pPlayer);
                 if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // if single-player
                 {
                     if (gDemo.bRecording)
                         gDemo.Close();
                     pInput->keyFlags.restart = 1;
-                    if (gRestoreLastSave)
+                    if (gRestoreLastSave || gGameOptions.bPermaDeath)
                         return; // return so ProcessFrame() can restart single-player
                 }
                 else
@@ -1751,7 +1807,12 @@ void ProcessInput(PLAYER *pPlayer)
         }
     }
     if (pInput->q16turn)
-        pPlayer->q16ang = (pPlayer->q16ang+pInput->q16turn)&0x7ffffff;
+    {
+        if (VanillaMode())
+            pPlayer->q16ang = ((pPlayer->q16ang&0x7ff0000)+(pInput->q16turn&0x7ff0000))&0x7ffffff;
+        else
+            pPlayer->q16ang = (pPlayer->q16ang+pInput->q16turn)&0x7ffffff;
+    }
     if (pInput->keyFlags.spin180)
     {
         if (!pPlayer->spin)
@@ -2526,6 +2587,7 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
         return nDamage;
     if (nDeathSeqID != 16)
     {
+        playerBackupItems(pPlayer);
         powerupClear(pPlayer);
         if (nXSector > 0 && xsector[nXSector].Exit)
             trTriggerSector(pSprite->sectnum, &xsector[nXSector], kCmdSectorExit, nSource);
@@ -2538,10 +2600,12 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
         FragPlayer(pPlayer, nSource);
         trTriggerSprite(nSprite, pXSprite, kCmdOff, nSource);
 
-        if (gRestoreLastSave && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording) // if died in single-player and not playing demo
+        if (gGameOptions.bPermaDeath && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording)
+            viewSetMessage("game over. press \"use\" or \"enter\" to quit");
+        else if (gRestoreLastSave && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording) // if died in single-player and not playing demo
         {
             extern short gQuickLoadSlot; // from menu.h
-            bool bAutosavedInSession = gAutosaveInCurLevel;
+            char bAutosavedInSession = gAutosaveInCurLevel;
             if (!bAutosavedInSession) // if player has not triggered autosave in current level, check if last manual save/load was in current level
                 bAutosavedInSession = LoadSavedInCurrentSession(gQuickLoadSlot) || LoadSavedInCurrentSession(kLoadSaveSlotQuick);
             if (bAutosavedInSession)

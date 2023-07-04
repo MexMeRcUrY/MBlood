@@ -48,6 +48,7 @@ int gSoundEarAng = 15; // angle for ear focus
 static int oldEarAng = gSoundEarAng;
 static int nEarAng = kAng15;
 
+int gSoundOcclusion = 0; // adjust 3D sound sources volume if they don't have clear line of sight to player
 int gSoundUnderwaterPitch = 0; // modify pitch when underwater
 
 BONKLE Bonkle[256];
@@ -55,11 +56,22 @@ BONKLE *BonkleCache[256];
 
 int nBonkles;
 
+DMGFEEDBACK gSoundDingSprite[4];
+const DMGFEEDBACK kSoundDingSpriteInit = {-1, 0, 0};
+
+int gSoundDing = 0;
+int gSoundDingVol = 75;
+int gSoundDingMinPitch = 22050;
+int gSoundDingMaxPitch = 22050;
+
 void sfxInit(void)
 {
     for (int i = 0; i < 256; i++)
         BonkleCache[i] = &Bonkle[i];
     nBonkles = 0;
+
+    for (int i = 0; i < 4; i++)
+        gSoundDingSprite[i] = kSoundDingSpriteInit;
 }
 
 void sfxTerm()
@@ -71,28 +83,46 @@ int Vol3d(int angle, int dist)
     return dist - mulscale16(dist, 0x2000 - mulscale30(0x2000, Cos(angle)));
 }
 
-static bool Calc3DSectOffset(spritetype *pLink, int *srcx, int *srcy, int *srcz, const int dstsect)
+inline int CalcYOffset(spritetype *pSprite)
+{
+    int z = pSprite->z;
+    const int nPicnum = pSprite->picnum;
+    const int nSizY = tilesiz[nPicnum].y;
+    if (nSizY == 0)
+        return z;
+
+    int height = (nSizY*pSprite->yrepeat)<<2;
+    if (pSprite->cstat&CSTAT_SPRITE_YCENTER)
+        z += height / 2;
+    const int nOffset = picanm[nPicnum].yofs;
+    if (nOffset)
+        z -= (nOffset*pSprite->yrepeat)<<2;
+    return pSprite->z - (z-(height>>1));
+}
+
+char Calc3DSectOffset(spritetype *pLink, int *srcx, int *srcy, int *srcz, int *bCanSeeSect, const int dstsect)
 {
     const int nLink = pLink->owner;
     if (!spriRangeIsFine(nLink)) // if invalid link
-        return false;
+        return 0;
     const spritetype *pOtherLink = &sprite[nLink];
 
     const int linksect = pLink->sectnum;
     if (!sectRangeIsFine(linksect) || !sectRangeIsFine(pOtherLink->sectnum)) // if invalid sector
-        return false;
+        return 0;
     if (IsUnderwaterSector(linksect)) // if other link is underwater
-        return false;
+        return 0;
     if (!AreSectorsNeighbors(pOtherLink->sectnum, dstsect, 4, true)) // if linked sector is not parallel to destination sector, abort
-        return false;
+        return 0;
 
     *srcx += pOtherLink->x-pLink->x;
     *srcy += pOtherLink->y-pLink->y;
     *srcz += pOtherLink->z-pLink->z;
-    return true;
+    *bCanSeeSect = pOtherLink->sectnum;
+    return 1;
 }
 
-static void Calc3DSects(int *srcx, int *srcy, int *srcz, const int srcsect, const int dstsect)
+inline void Calc3DSects(int *srcx, int *srcy, int *srcz, const int srcsect, const int dstsect, int *bCanSeeSect)
 {
     if (srcsect == dstsect) // if source and listener are in same sector
         return;
@@ -104,22 +134,50 @@ static void Calc3DSects(int *srcx, int *srcy, int *srcz, const int srcsect, cons
     const int nUpper = gUpperLink[srcsect], nLower = gLowerLink[srcsect];
     if ((nUpper >= 0) && (sector[sprite[nUpper].sectnum].floorpicnum >= 4080) && (sector[sprite[nUpper].sectnum].floorpicnum <= 4095)) // sector has a ror upper link
     {
-        if (Calc3DSectOffset(&sprite[nUpper], srcx, srcy, srcz, dstsect))
+        if (Calc3DSectOffset(&sprite[nUpper], srcx, srcy, srcz, bCanSeeSect, dstsect))
             return;
     }
     if ((nLower >= 0) && (sector[sprite[nLower].sectnum].ceilingpicnum >= 4080) && (sector[sprite[nLower].sectnum].ceilingpicnum <= 4095)) // sector has a ror lower link
     {
-        Calc3DSectOffset(&sprite[nLower], srcx, srcy, srcz, dstsect);
+        if (Calc3DSectOffset(&sprite[nLower], srcx, srcy, srcz, bCanSeeSect, dstsect))
+            return;
     }
+    return;
+}
+
+inline void Calc3DOcclude(const BONKLE *pBonkle, int *nDist, const int posX, const int posY, const int posZ, int bCanSeeSect)
+{
+    if ((pBonkle->nType >= kGenSound) && (pBonkle->nType <= kSoundPlayer)) // don't occlude these types
+        return;
+    if (!sectRangeIsFine(bCanSeeSect))
+        bCanSeeSect = pBonkle->sectnum;
+
+    const char bIsExplosion = (pBonkle->sfxId >= 303) && (pBonkle->sfxId <= 307);
+    int bCanSeeZ = posZ-pBonkle->zOff;
+    const int fz = getflorzofslope(bCanSeeSect, posX, posY);
+    if (fz <= bCanSeeZ)
+    {
+        bCanSeeZ = fz-pBonkle->zOff;
+    }
+    else
+    {
+        const int cz = getceilzofslope(bCanSeeSect, posX, posY);
+        if (cz >= bCanSeeZ)
+            bCanSeeZ = cz-(-pBonkle->zOff);
+    }
+
+    if (!cansee(gMe->pSprite->x, gMe->pSprite->y, gMe->zView, gMe->pSprite->sectnum, posX, posY, bCanSeeZ, bCanSeeSect))
+        *nDist = bIsExplosion ? *nDist+(*nDist>>1)-(*nDist>>2) : *nDist<<1;
 }
 
 void Calc3DValues(BONKLE *pBonkle)
 {
+    int bCanSeeSect = -1;
     int posX = pBonkle->curPos.x;
     int posY = pBonkle->curPos.y;
     int posZ = pBonkle->curPos.z;
     if (!VanillaMode()) // check if sound source is occurring in a linked sector (room over room)
-        Calc3DSects(&posX, &posY, &posZ, pBonkle->sectnum, gMe->pSprite->sectnum);
+        Calc3DSects(&posX, &posY, &posZ, pBonkle->sectnum, gMe->pSprite->sectnum, &bCanSeeSect);
     const int dx = posX - gMe->pSprite->x;
     const int dy = posY - gMe->pSprite->y;
     const int dz = posZ - gMe->pSprite->z;
@@ -134,6 +192,8 @@ void Calc3DValues(BONKLE *pBonkle)
     rPhase = phaseLeft - phaseMin;
 
     int distance3D = approxDist3D(dx, dy, dz);
+    if (gSoundOcclusion)
+        Calc3DOcclude(pBonkle, &distance3D, posX, posY, posZ, bCanSeeSect);
     distance3D = ClipLow((distance3D >> 2) + (distance3D >> 3), 64);
     const int nVol = scale(pBonkle->vol, 80, distance3D);
     const int nEarAngle = gStereo ? nEarAng : kAng15;
@@ -147,9 +207,15 @@ void Calc3DValues(BONKLE *pBonkle)
     }
     const int sinVal = Sin(angle);
     const int cosVal = Cos(angle);
-    const int nPitch = dmulscale30r(cosVal, pBonkle->curPos.x - pBonkle->oldPos.x, sinVal, pBonkle->curPos.y - pBonkle->oldPos.y);
-    lPitch = scale(pBonkle->pitch, dmulscale30r(cosVal, earVL.dx, sinVal, earVL.dy) + nSoundSpeed, nPitch + nSoundSpeed);
-    rPitch = scale(pBonkle->pitch, dmulscale30r(cosVal, earVR.dx, sinVal, earVR.dy) + nSoundSpeed, nPitch + nSoundSpeed);
+    const int nPitch = dmulscale30r(cosVal, pBonkle->curPos.x - pBonkle->oldPos.x, sinVal, pBonkle->curPos.y - pBonkle->oldPos.y) + nSoundSpeed;
+    if (nPitch == 0) // don't allow div by zero
+    {
+        lPitch = rPitch = ClipRange(pBonkle->pitch, 5000, 50000);
+        return;
+    }
+
+    lPitch = scale(pBonkle->pitch, dmulscale30r(cosVal, earVL.dx, sinVal, earVL.dy) + nSoundSpeed, nPitch);
+    rPitch = scale(pBonkle->pitch, dmulscale30r(cosVal, earVR.dx, sinVal, earVR.dy) + nSoundSpeed, nPitch);
     lPitch = ClipRange(lPitch, 5000, 50000);
     rPitch = ClipRange(rPitch, 5000, 50000);
 }
@@ -178,6 +244,8 @@ void sfxPlay3DSound(int x, int y, int z, int soundId, int nSector)
     pBonkle->sectnum = nSector;
     FindSector(x, y, z, &pBonkle->sectnum);
     pBonkle->oldPos = pBonkle->curPos;
+    pBonkle->zOff = 0;
+    pBonkle->nType = 0;
     pBonkle->sfxId = soundId;
     pBonkle->hSnd = hRes;
     pBonkle->vol = pEffect->relVol;
@@ -273,6 +341,8 @@ void sfxPlay3DSound(spritetype *pSprite, int soundId, int chanId, int nFlags)
     pBonkle->curPos.z = pSprite->z;
     pBonkle->sectnum = pSprite->sectnum;
     pBonkle->oldPos = pBonkle->curPos;
+    pBonkle->zOff = CalcYOffset(pSprite);
+    pBonkle->nType = pSprite->type;
     pBonkle->sfxId = soundId;
     pBonkle->hSnd = hRes;
     pBonkle->vol = pEffect->relVol;
@@ -387,6 +457,8 @@ void sfxPlay3DSoundCP(spritetype* pSprite, int soundId, int chanId, int nFlags, 
     pBonkle->curPos.z = pSprite->z;
     pBonkle->sectnum = pSprite->sectnum;
     pBonkle->oldPos = pBonkle->curPos;
+    pBonkle->zOff = CalcYOffset(pSprite);
+    pBonkle->nType = pSprite->type;
     pBonkle->sfxId = soundId;
     pBonkle->hSnd = hRes;
     switch (volume)
@@ -488,6 +560,9 @@ void sfxKillAllSounds(void)
     {
         sfxKillSoundInternal(i);
     }
+
+    for (int i = 0; i < 4; i++)
+        gSoundDingSprite[i] = kSoundDingSpriteInit;
 }
 
 void sfxKillSpriteSounds(spritetype *pSprite)
@@ -522,7 +597,14 @@ void sfxUpdateSpritePos(spritetype *pSprite, vec3_t *pOffsetPos)
                 pBonkle->oldPos.z = pSprite->z+(pBonkle->oldPos.z-pOffsetPos->z);
             }
             else
+            {
                 pBonkle->oldPos = pBonkle->curPos;
+            }
+            if (gSoundOcclusion)
+            {
+                pBonkle->zOff = CalcYOffset(pSprite);
+                pBonkle->nType = pSprite->type;
+            }
         }
     }
 }
@@ -578,6 +660,38 @@ static void sfxUpdateEarAng(void)
     }
 }
 
+inline int ClampScale(int nVal, int nInMin, int nInMax, int nOutMin, int nOutMax)
+{
+	if (nInMin == nInMax)
+		return (nVal - nInMax) >= 0 ? nOutMax : nOutMin;
+	float cVal = float(nVal - nInMin) / float(nInMax - nInMin);
+	cVal = ClipRangeF(cVal, 0.f, 1.f);
+
+	return nOutMin + int(float(nOutMax - nOutMin) * cVal);
+}
+
+static void sfxPlayerDamageFeedback(void)
+{
+    const int kMinDam = 50, kMaxDam = 1500, kDelayTicks = 7;
+    for (int i = 0; i < 4; i++)
+    {
+        DMGFEEDBACK *pSoundDmgSprite = &gSoundDingSprite[i];
+        if (pSoundDmgSprite->nSprite == -1) // reached end of attacked sprite list, stop
+            break;
+        const int nTickDiff = klabs(gLevelTime - pSoundDmgSprite->nTick);
+        if (!nTickDiff) // this sfx will trigger in the same tick, skip
+            continue;
+        if (nTickDiff < kDelayTicks) // this sfx will trigger too soon, skip
+            continue;
+
+        const int nRate = ClampScale(pSoundDmgSprite->nDamage, kMinDam, kMaxDam, gSoundDingMinPitch, gSoundDingMaxPitch);
+        sndStartSample("HITSOUND", gSoundDingVol, -1, nRate);
+        pSoundDmgSprite->nSprite = -1;
+        pSoundDmgSprite->nDamage = 0;
+        pSoundDmgSprite->nTick = gLevelTime;
+    }
+}
+
 static void sfxModifyPitchUnderwater(spritetype *pSndSpr, int *nPitch)
 {
     if (pSndSpr && (pSndSpr == gMe->pSprite)) // if sound is assigned to player sprite, don't modify pitch
@@ -592,6 +706,8 @@ void sfxUpdate3DSounds(void)
     sfxUpdateListenerVel();
     sfxUpdateSpeedOfSound();
     sfxUpdateEarAng();
+    if (gSoundDing)
+        sfxPlayerDamageFeedback();
     const char bUnderwater = gSoundUnderwaterPitch && !VanillaMode() && gMe->pSprite && sectRangeIsFine(gMe->pSprite->sectnum) && IsUnderwaterSector(gMe->pSprite->sectnum); // if underwater, lower audio pitch
     for (int i = nBonkles - 1; i >= 0; i--)
     {

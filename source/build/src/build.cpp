@@ -72,10 +72,6 @@ int32_t graphicsmode = 0;
 
 int32_t synctics = 0, lockclock = 0;
 
-// those ones save the respective 3d video vars while in 2d mode
-// so that exiting from mapster32 in 2d mode saves the correct ones
-float vid_gamma_3d=-1, vid_contrast_3d=-1, vid_brightness_3d=-1;
-
 int32_t bppgame = 8;
 int32_t forcesetup = 1;
 
@@ -158,7 +154,7 @@ static vec2_t tempxyar[MAXWALLS];
 
 static int32_t mousx, mousy;
 int16_t prefixtiles[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-uint8_t hlsectorbitmap[(MAXSECTORS+7)>>3];  // show2dsector is already taken...
+uint8_t hlsectorbitmap[bitmap_size(MAXSECTORS)];  // show2dsector is already taken...
 static int32_t minhlsectorfloorz, numhlsecwalls;
 int32_t searchlock = 0;
 
@@ -166,7 +162,7 @@ int32_t searchlock = 0;
 //  - hl_all_bunch_sectors_p
 //  - AlignWalls
 //  - trace_loop
-static uint8_t visited[(MAXWALLS+7)>>3];
+static uint8_t visited[bitmap_size(MAXWALLS)];
 
 int32_t m32_2d3dmode = 0;
 int32_t m32_2d3dsize = 4;
@@ -238,7 +234,7 @@ static int32_t menuselect(void);
 static int32_t menuselect_auto(int, int); //PK
 
 static int32_t insert_sprite_common(int32_t sectnum, int32_t dax, int32_t day);
-static void correct_ornamented_sprite(int32_t i, int32_t hitw);
+static void correct_ornamented_sprite(int32_t i, hitdata_t const &hit);
 
 static int32_t getfilenames(const char *path, const char *kind);
 
@@ -461,6 +457,19 @@ static void m32_keypresscallback(int32_t code, int32_t downp)
     VM_OnEvent(EVENT_KEYPRESS, -1);
 }
 
+static void fileDropCallback(char const *fn)
+{
+    if (asksave)
+        message("You have unsaved changes.");
+    else
+    {
+        auto ret = LoadBoard(fn, 0);
+
+        if (ret)
+            message("^13Invalid map format, nothing loaded (code %d).", ret);
+    }
+}
+
 void M32_ResetFakeRORTiles(void)
 {
 #ifdef POLYMER
@@ -625,7 +634,7 @@ void editorMaybeLockMouse(int lock)
 
 int app_main(int argc, char const* const* argv)
 {
-    Bstrcpy(tempbuf, AppProperName);
+    Bstrcpy(tempbuf, AppTechnicalName);
     Bstrcat(tempbuf, ".log");
 
     engineSetLogFile(tempbuf);
@@ -657,7 +666,7 @@ int app_main(int argc, char const* const* argv)
     if (i) cmdsetup = 1;
 #endif
 #ifdef _WIN32
-    win_priorityclass = 1;
+    win_boostpriority = 1;
 #endif
 
     for (i=1; i<argc; i++)
@@ -755,6 +764,8 @@ int app_main(int argc, char const* const* argv)
     if (enginePostInit())
         M32_FatalEngineError();
 
+    g_fileDropCallback = fileDropCallback;
+
     ExtPostInit();
 
 #ifdef YAX_ENABLE
@@ -820,17 +831,8 @@ int app_main(int argc, char const* const* argv)
     keySetCallback(&m32_keypresscallback);
     editorMaybeLockMouse(0);
 
-
     if (cursectnum == -1)
     {
-        vid_gamma_3d = g_videoGamma;
-        vid_brightness_3d = g_videoBrightness;
-        vid_contrast_3d = g_videoContrast;
-
-        g_videoGamma = g_videoContrast = 1.0;
-        g_videoBrightness = 0.0;
-
-        videoSetPalette(0,0,0);
         if (videoSetGameMode(fullscreen, xdim, ydim, 8, upscalefactor) < 0)
         {
             ExtUnInit();
@@ -840,17 +842,8 @@ int app_main(int argc, char const* const* argv)
         }
 
         system_getcvars();
-
         overheadeditor();
         keystatus[buildkeys[BK_MODE2D_3D]] = 0;
-
-        g_videoGamma = vid_gamma_3d;
-        g_videoContrast = vid_contrast_3d;
-        g_videoBrightness = vid_brightness_3d;
-
-        vid_gamma_3d = vid_contrast_3d = vid_brightness_3d = -1;
-
-        videoSetPalette(GAMMA_CALC,0,0);
     }
     else
     {
@@ -863,9 +856,9 @@ int app_main(int argc, char const* const* argv)
         }
 
         system_getcvars();
-
-        videoSetPalette(GAMMA_CALC,0,0);
     }
+
+    videoSetPalette(GAMMA_CALC,0,0);
 
 CANCEL:
     quitflag = 0;
@@ -1531,7 +1524,7 @@ void editinput(void)
 #endif
                 hitscan((const vec3_t *)&pos,cursectnum,              //Start position
                     da.x,da.y,dz, //vector of 3D ang
-                    &hit,CLIPMASK1);
+                    &hit,spriteinsertmode ? CLIPMASK1 | (CSTAT_SPRITE_BLOCK << 16) : CLIPMASK1);
 
             if (hit.sect >= 0)
             {
@@ -1557,12 +1550,12 @@ void editinput(void)
                     spriteoncfz(i, &cz, &fz);
                     sprite[i].z = clamp2(hit.z, cz, fz);
 
-                    if (AIMING_AT_WALL || AIMING_AT_MASKWALL)
+                    if (AIMING_AT_WALL || AIMING_AT_MASKWALL || (AIMING_AT_SPRITE && (sprite[searchwall].cstat & CSTAT_SPRITE_ALIGNMENT_SLAB) == CSTAT_SPRITE_ALIGNMENT_WALL))
                     {
                         sprite[i].cstat &= ~48;
                         sprite[i].cstat |= (16+64);
 
-                        correct_ornamented_sprite(i, hit.wall);
+                        correct_ornamented_sprite(i, hit);
                     }
                     else
                         sprite[i].cstat |= (tilesiz[sprite[i].picnum].y>=32);
@@ -1619,27 +1612,9 @@ void editinput(void)
 
     if (keystatus[buildkeys[BK_MODE2D_3D]] && !m32_is2d3dmode())  // Enter
     {
-
-        vid_gamma_3d = g_videoGamma;
-        vid_contrast_3d = g_videoContrast;
-        vid_brightness_3d = g_videoBrightness;
-
-        g_videoGamma = g_videoContrast = 1.0;
-        g_videoBrightness = 0.0;
-
-        videoSetPalette(0,0,0);
-
         keystatus[buildkeys[BK_MODE2D_3D]] = 0;
         overheadeditor();
         keystatus[buildkeys[BK_MODE2D_3D]] = 0;
-
-        g_videoGamma = vid_gamma_3d;
-        g_videoContrast = vid_contrast_3d;
-        g_videoBrightness = vid_brightness_3d;
-
-        vid_gamma_3d = vid_contrast_3d = vid_brightness_3d = -1;
-
-        videoSetPalette(GAMMA_CALC,0,0);
     }
 }
 
@@ -2308,21 +2283,27 @@ static void duplicate_selected_sprites(void)
     }
 }
 
-static void correct_ornamented_sprite(int32_t i, int32_t hitw)
+static void correct_ornamented_sprite(int32_t i, hitdata_t const &hit)
 {
     int32_t j;
 
-    if (hitw >= 0)
+    if (hit.sprite >= 0)
     {
-        sprite[i].ang = (getangle(POINT2(hitw).x-wall[hitw].x,
-                                  POINT2(hitw).y-wall[hitw].y)+512)&2047;
+        if (klabs(ang - sprite[hit.sprite].ang) < 1024)
+            sprite[i].ang = (sprite[hit.sprite].ang + 1024) & 2047;
+        else sprite[i].ang = sprite[hit.sprite].ang;
+    }
+    else if (hit.wall >= 0)
+    {
+        sprite[i].ang = (getangle(POINT2(hit.wall).x-wall[hit.wall].x,
+                                  POINT2(hit.wall).y-wall[hit.wall].y)+512)&2047;
 
         //Make sure sprite's in right sector
         if (inside(sprite[i].x, sprite[i].y, sprite[i].sectnum) != 1)
         {
-            j = wall[hitw].point2;
-            sprite[i].x -= ksgn(wall[j].y-wall[hitw].y);
-            sprite[i].y += ksgn(wall[j].x-wall[hitw].x);
+            j = wall[hit.wall].point2;
+            sprite[i].x -= ksgn(wall[j].y-wall[hit.wall].y);
+            sprite[i].y += ksgn(wall[j].x-wall[hit.wall].x);
         }
     }
 }
@@ -2335,7 +2316,7 @@ void DoSpriteOrnament(int32_t i)
             sintable[(sprite[i].ang+1536)&2047],
             sintable[(sprite[i].ang+1024)&2047],
             0,
-            &hit,CLIPMASK1);
+            &hit,spriteinsertmode ? CLIPMASK1 | (CSTAT_SPRITE_BLOCK << 16) : CLIPMASK1);
 
     if (hit.sect == -1)
         return;
@@ -2343,7 +2324,7 @@ void DoSpriteOrnament(int32_t i)
     sprite[i].xyz = hit.xyz;
     changespritesect(i, hit.sect);
 
-    correct_ornamented_sprite(i, hit.wall);
+    correct_ornamented_sprite(i, hit);
 }
 
 void update_highlight(void)
@@ -2614,7 +2595,7 @@ static void updatesprite1(int16_t i)
 
 #ifdef YAX_ENABLE
 // highlighted OR grayed-out sectors:
-static uint8_t hlorgraysectbitmap[(MAXSECTORS+7)>>3];
+static uint8_t hlorgraysectbitmap[bitmap_size(MAXSECTORS)];
 static int32_t ask_above_or_below(void);
 #else
 # define hlorgraysectbitmap hlsectorbitmap
@@ -2693,19 +2674,20 @@ static int32_t trace_loop(int32_t j, uint8_t *visitedwall, int16_t *ignore_ret, 
 
         while (wall[j].nextwall>=0 && n>0)
         {
-#if 0
-//def YAX_ENABLE
+#if 0 && defined YAX_ENABLE
             if (yaxp)
             {
                 int32_t ns = wall[j].nextsector;
-                if ((hlsectorbitmap[ns>>3]&pow2char[ns&7])==0)
+                if (!bitmap_test(hlsectorbitmap, ns))
                     break;
             }
 #endif
             j = wall[wall[j].nextwall].point2;
-//            if (j!=refwall && (visitedwall[j>>3]&pow2char[j&7]))
-//                ignore = 1;
-//            visitedwall[j>>3] |= pow2char[j&7];
+#if 0
+            if (j != refwall && bitmap_test(visitedwall, j))
+                ignore = 1;
+            bitmap_set(visitedwall, j);
+#endif
             n--;
         }
     }
@@ -2811,7 +2793,7 @@ void reset_highlight(void)  // walls and sprites
 #ifdef YAX_ENABLE
 static int16_t collnumsects[2];
 static int16_t collsectlist[2][MAXSECTORS];
-static uint8_t collsectbitmap[2][(MAXSECTORS+7)>>3];
+static uint8_t collsectbitmap[2][bitmap_size(MAXSECTORS)];
 
 static void collect_sectors1(int16_t *sectlist, uint8_t *sectbitmap, int16_t *numsectptr,
                              int16_t startsec, int32_t alsoyaxnext, int32_t alsoonw)
@@ -3020,7 +3002,7 @@ static int32_t hl_all_bunch_sectors_p()
 
     if (numyaxbunches > 0)
     {
-        Bmemset(havebunch, 0, (numyaxbunches+7)>>3);
+        Bmemset(havebunch, 0, bitmap_size(numyaxbunches));
         for (i=0; i<highlightsectorcnt; i++)
         {
             yax_getbunches(highlightsector[i], &cb, &fb);
@@ -3097,11 +3079,11 @@ static void M32_MarkPointInsertion(int32_t thewall)
                 bitmap_set(editwall, i);
     // round 2 (enough?)
     for (YAX_ITER_WALLS(thewall, i, tmpcf))
-        if (wall[i].nextwall >= 0 && bitmap_test(editwall, wall[i].nextwall)==0)
+        if (wall[i].nextwall >= 0 && !bitmap_test(editwall, wall[i].nextwall))
             bitmap_set(editwall, wall[i].nextwall);
     if (nextw >= 0)
         for (YAX_ITER_WALLS(nextw, i, tmpcf))
-            if (wall[i].nextwall >= 0 && bitmap_test(editwall, wall[i].nextwall)==0)
+            if (wall[i].nextwall >= 0 && !bitmap_test(editwall, wall[i].nextwall))
                 bitmap_set(editwall, wall[i].nextwall);
 }
 #endif
@@ -3134,7 +3116,7 @@ static int32_t M32_InsertPoint(int32_t thewall, int32_t dax, int32_t day, int16_
 
         j = 0;
         for (i=0; i<numwalls; i++)
-            j += !!(bitmap_test(editwall, i));
+            j += !!bitmap_test(editwall, i);
         if (max(numwalls,onewnumwalls)+j > MAXWALLS)
         {
             return 0;  // no points inserted, would exceed limits
@@ -3607,6 +3589,9 @@ void editorMaybeWarpMouse(int searchx, int searchy)
 #endif
     handleevents();
     mouseLockToWindow(0);
+#else
+    UNREFERENCED_PARAMETER(searchx);
+    UNREFERENCED_PARAMETER(searchy);
 #endif
 }
 
@@ -4100,7 +4085,7 @@ skipinput:
                     if (j>=0 && sector[j].wallptr > i)
                         j--;
 
-                    if (zoom < 768 && !(bitmap_test(editwall, i)))
+                    if (zoom < 768 && !bitmap_test(editwall, i))
                         continue;
 
                     YAX_SKIPWALL(i);
@@ -5154,7 +5139,7 @@ rotate_hlsect_out:
                     if (i < j)
                         j = i;
 
-                    if ((bitmap_test(show2dwall, i))==0)
+                    if (!bitmap_test(show2dwall, i))
                     {
                         message("All loop points must be highlighted to punch");
                         goto end_yax;
@@ -5521,7 +5506,7 @@ end_yax: ;
                     // didmakered: 'bad'!
                     int32_t didmakered = (highlightsectorcnt<0) || eitherCTRL, hadouterpoint=0;
 #ifdef YAX_ENABLE
-                    for (i=0; i<(MAXSECTORS+7)>>3; i++)
+                    for (i=0; i<bitmap_size(MAXSECTORS); i++)
                         hlorgraysectbitmap[i] = hlsectorbitmap[i]|graysectbitmap[i];
 #endif
                     for (i=0; i<highlightsectorcnt; i++)
@@ -5751,7 +5736,7 @@ end_autoredwall:
 #ifdef YAX_ENABLE
                     // home: ceilings, end: floors
                     int32_t fb, bunchsel = keystatus[sc_End] ? 1 : (keystatus[sc_Home] ? 0 : -1);
-                    uint8_t bunchbitmap[(YAX_MAXBUNCHES+7)>>3];
+                    uint8_t bunchbitmap[bitmap_size(YAX_MAXBUNCHES)];
                     Bmemset(bunchbitmap, 0, sizeof(bunchbitmap));
 #endif
                     if (!m32_sideview)
@@ -6558,7 +6543,7 @@ end_point_dragging:
                     if (onwisvalid())
                     {
                         static int16_t ocollsectlist[MAXSECTORS];
-                        static uint8_t tcollbitmap[(MAXSECTORS+7)>>3];
+                        static uint8_t tcollbitmap[bitmap_size(MAXSECTORS)];
                         int16_t ocollnumsects=collnumsects[movestat], tmpsect;
 
                         Bmemcpy(ocollsectlist, collsectlist[movestat], ocollnumsects*sizeof(int16_t));
@@ -6573,7 +6558,7 @@ end_point_dragging:
                                 tmpsect = sectorofwall(onextwall[j]);
                                 sectors_components(1, &tmpsect, 1,0);
 
-                                for (m=0; m<(numsectors+7)>>3; m++)
+                                for (m=0; m<bitmap_size(numsectors); m++)
                                     tcollbitmap[m] |= collsectbitmap[0][m];
                                 moveonwp = 1;
                             }
@@ -6979,8 +6964,8 @@ end_point_dragging:
 
                             loopnum--;
                         }
-                        while (loopnum>0 && ((bitmap_test(editwall, i))==0)
-                                   && (wall[i].nextsector != joinsector[1-joink]));
+                        while (loopnum > 0 && !bitmap_test(editwall, i)
+                                   && wall[i].nextsector != joinsector[1-joink]);
 
                         wall[newnumwalls-1].point2 = m;
 
@@ -7890,7 +7875,7 @@ end_space_handling:
 
                     for (i=0; i<numdrawnwalls; i++)
                     {
-                        char touchedwall[(MAXWALLS+7)>>3];
+                        char touchedwall[bitmap_size(MAXWALLS)];
                         Bmemset(touchedwall, 0, sizeof(touchedwall));
 
                         for (j=numwalls-1; j>=0; j--)  /* j may be modified in loop */
@@ -7986,7 +7971,7 @@ end_batch_insert_points:
 
 #ifdef YAX_ENABLE
             int16_t cb, fb;
-            uint8_t bunchbitmap[(YAX_MAXBUNCHES+7)>>3];
+            uint8_t bunchbitmap[bitmap_size(YAX_MAXBUNCHES)];
             Bmemset(bunchbitmap, 0, sizeof(bunchbitmap));
 #endif
             keystatus[sc_Delete] = 0;
@@ -8012,7 +7997,7 @@ end_batch_insert_points:
                 if (highlightsectorcnt > 0)
                 {
                     // LShift: force highlighted sector deleting
-                    if (keystatus[sc_LeftShift] || (bitmap_test(hlsectorbitmap, i)))
+                    if (keystatus[sc_LeftShift] || bitmap_test(hlsectorbitmap, i))
                     {
                         for (j=highlightsectorcnt-1; j>=0; j--)
                         {
@@ -8684,6 +8669,8 @@ static void SaveBoardAndPrintMessage(const char *fn)
                     saveboard_savedtags?"and tags ":"", f, saveboard_fixedsprites);
         else
             message("Saved board %sto %s.", saveboard_savedtags?"and tags ":"", f);
+
+        asksave = 0;
     }
     else
     {
@@ -8990,7 +8977,7 @@ int32_t getpointhighlight(int32_t xplc, int32_t yplc, int32_t point)
 
                 // was (dst <= dist), but this way, when duplicating sprites,
                 // the selected ones are dragged first
-                if (dst < dist || (dst == dist && (bitmap_test(show2dsprite, i))))
+                if (dst < dist || (dst == dist && bitmap_test(show2dsprite, i)))
                     dist = dst, closest = i+16384;
             }
 

@@ -282,13 +282,12 @@ void ctrlGetInput(void)
 
     if (BUTTON(gamefunc_Toggle_Crosshair))
     {
-        const char *zCrosshairStrings[3] = {"Crosshair OFF", "Crosshair ON", "Crosshair Auto Aim ON"};
+        static int32_t nAimReticleOld = 1;
         CONTROL_ClearButton(gamefunc_Toggle_Crosshair);
-        gAimReticle = (gAimReticle+1)%3;
-        if ((gAimReticle == 2) && (!gProfile[gMe->nPlayer].nAutoAim)) // if autoaim is off, don't set to autoaim mode
-            gAimReticle = 0;
-        if (!bSilentAim && gProfile[gMe->nPlayer].nAutoAim) // only show messages if autoaim is active
-            viewSetMessage(zCrosshairStrings[gAimReticle]);
+        if (!gAimReticle)
+            gAimReticle = nAimReticleOld;
+        else
+            nAimReticleOld = gAimReticle, gAimReticle = 0;
     }
 
     if (BUTTON(gamefunc_Next_Weapon))
@@ -517,7 +516,7 @@ void ctrlGetInput(void)
     if (turnRight)
         input.q16turn = fix16_sadd(input.q16turn, fix16_from_float(scaleAdjustmentToInterval(ClipHigh(12 * turnHeldTime, gTurnSpeed)>>2)));
 
-    if ((run2 || run) && turnHeldTime > 24)
+    if (!gTurnAcceleration || (((gTurnAcceleration == 2) || run2 || run) && (turnHeldTime > 24)))
         input.q16turn <<= 1;
 
     if (BUTTON(gamefunc_Strafe))

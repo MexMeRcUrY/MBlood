@@ -319,6 +319,7 @@ void LevelWarpAndRecord(int nEpisode, int nLevel)
     gGameOptions.nEnemySpeed = 0;
     gGameOptions.bEnemyShuffle = false;
     gGameOptions.bPitchforkOnly = false;
+    gGameOptions.bPermaDeath = false;
     gGameOptions.uSpriteBannedFlags = BANNED_NONE;
     playerSetSkill(gGameOptions.nDifficulty); // set skill to same value as current difficulty
     StartLevel(&gGameOptions);
@@ -407,7 +408,7 @@ void CGameMessageMgr::Display(void)
             int initialNrOfDisplayedMsgs = numberOfDisplayedMessages;
             int initialMessagesIndex = messagesIndex;
             int shade = ClipHigh(initialNrOfDisplayedMsgs*8, 48);
-            int x = gViewMode == 3 ? gViewX0S-xoffset : 0;
+            int x = gViewX0S-xoffset;
             int y = (gViewMode == 3 ? this->y : 0) + (int)at9;
             for (int i = 0; i < initialNrOfDisplayedMsgs; i++)
             {
@@ -456,8 +457,8 @@ void CGameMessageMgr::Display(void)
             SortMessagesByTime(messagesToDisplay, messagesToDisplayCount);
 
             int shade = ClipHigh(messagesToDisplayCount*8, 48);
-            int x = gViewMode == 3 ? gViewX0S-xoffset : 0;
-            int y = (gViewMode == 3 ? this->y : 0) + (int)at9;
+            int x = gViewX0S-xoffset;
+            int y = this->y + (int)at9;
             for (int i = 0; i < messagesToDisplayCount; i++)
             {
                 messageStruct* pMessage = messagesToDisplay[i];
@@ -570,8 +571,8 @@ void CPlayerMsg::Draw(void)
     strcpy(buffer, text);
     if ((int)totalclock & 16)
         strcat(buffer, "_");
-    int x = gViewMode == 3 ? gViewX0S-xoffset : 0;
-    int y = gViewMode == 3 ? gViewY0S : 0;
+    int x = gViewX0S-xoffset;
+    int y = gViewY0S;
     if (gViewSize >= 1)
         y += tilesiz[2229].y*((gNetPlayers+3)/4);
     viewDrawText(0, buffer, x+1,y+1, -128, 0, 0, false, 256);

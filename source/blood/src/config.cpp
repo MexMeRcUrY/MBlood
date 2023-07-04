@@ -75,6 +75,7 @@ int32_t useprecache;
 char CommbatMacro[MAXRIDECULE][MAXRIDECULELENGTH];
 char szPlayerName[MAXPLAYERNAME];
 int32_t gTurnSpeed;
+int32_t gTurnAcceleration;
 int32_t gCenterViewOnDrop;
 int32_t gCrouchToggle;
 int32_t gDetail;
@@ -112,6 +113,7 @@ int32_t gMessageTime;
 int32_t gMessageFont;
 int32_t gStereo;
 int32_t gPlayerTeamPreference;
+int32_t gShowLoadingSavingBackground;
 int32_t gShowPlayerNames;
 int32_t gShowWeapon;
 int32_t gMouseSensitivity;
@@ -353,11 +355,7 @@ void CONFIG_SetDefaults(void)
     }
 #endif
 
-#ifdef USE_OPENGL
-    gSetup.bpp = 32;
-#else
     gSetup.bpp = 8;
-#endif
 
 #if defined(_WIN32)
     MixRate = 44100;
@@ -482,8 +480,9 @@ void CONFIG_SetDefaults(void)
     gRollAngle = 0;
     gCenterHoriz = 1;
     gDeliriumBlur = 1;
-    gViewSize = 2;
+    gViewSize = 3;
     gTurnSpeed = 92;
+    gTurnAcceleration = 1;
     gCenterViewOnDrop = 0;
     gCrouchToggle = 0;
     gDetail = 4;
@@ -496,7 +495,7 @@ void CONFIG_SetDefaults(void)
     gMultiKill = 2;
     gViewInterpolate = 1;
     gPanningInterpolate = 1;
-    gWeaponInterpolate = 0;
+    gWeaponInterpolate = 1;
     gViewHBobbing = 1;
     gViewVBobbing = 1;
     gWeaponHBobbing = 1;
@@ -513,6 +512,7 @@ void CONFIG_SetDefaults(void)
     gMessageFont = 0;
     gStereo = 1;
     gPlayerTeamPreference = 0;
+    gShowLoadingSavingBackground = 0;
     gShowPlayerNames = 1;
     gShowWeapon = 2;
     gCutScenes = 1;

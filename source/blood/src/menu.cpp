@@ -81,6 +81,7 @@ void SetMouseAimFlipped(CGameMenuItemZBool *);
 void SetTurnSpeed(CGameMenuItemSlider *);
 void SetCenterView(CGameMenuItemZBool *);
 void SetJoystickRumble(CGameMenuItemZBool *);
+void SetTurnAcceleration(CGameMenuItemZCycle *);
 void SetCrouchToggle(CGameMenuItemZBool *);
 void SetAutoRun(CGameMenuItemZBool *);
 void ResetKeys(CGameMenuItemChain *);
@@ -162,6 +163,17 @@ const char *zMonsterStrings[] =
     "Respawn (60 Secs)",
     "Respawn (90 Secs)",
     "Respawn (120 Secs)",
+};
+
+const char *zMonsterMenuStrings[] =
+{
+    "MONSTER SETTING:               NONE",
+    "MONSTER SETTING:       BRING 'EM ON",
+    "MONSTER SETTING:  RESPAWN (15 SECS)",
+    "MONSTER SETTING:  RESPAWN (30 SECS)",
+    "MONSTER SETTING:  RESPAWN (60 SECS)",
+    "MONSTER SETTING:  RESPAWN (90 SECS)",
+    "MONSTER SETTING: RESPAWN (120 SECS)",
 };
 
 const char *zWeaponStrings[] =
@@ -304,6 +316,7 @@ CGameMenu menuHelp;
 CGameMenu menuNetwork;
 CGameMenu menuNetworkHost;
 CGameMenu menuNetworkJoin;
+CGameMenu menuNetworkGameMonsters;
 CGameMenu menuNetworkGameMutators;
 
 CGameMenuItemQAV itemBloodQAV("", 3, 160, 100, "BDRIP", true);
@@ -315,7 +328,7 @@ CGameMenuItemQAV itemHelp5QAV("", 3, 160, 100, "HELP5", false, true);
 
 CGameMenuItemTitle itemMainTitle("BLOOD", 1, 160, 20, 2038);
 CGameMenuItemChain itemMain1("NEW GAME", 1, 0, 45, 320, 1, &menuEpisode, -1, NULL, 0);
-CGameMenuItemChain itemMain2("MULTIPLAYER", 1, 0, 65, 320, 1, &menuNetwork, -1, NULL, 0);
+CGameMenuItemChain itemMain2("PLAY ONLINE", 1, 0, 65, 320, 1, &menuNetwork, -1, NULL, 0);
 CGameMenuItemChain itemMain3("OPTIONS", 1, 0, 85, 320, 1, &menuOptions, -1, NULL, 0);
 CGameMenuItemChain itemMain4("LOAD GAME", 1, 0, 105, 320, 1, &menuLoadGame, -1, NULL, 0);
 CGameMenuItemChain itemMain5("HELP", 1, 0, 125, 320, 1, &menuHelp, -1, NULL, 0);
@@ -350,14 +363,15 @@ CGameMenuItemChain itemDifficultyCustom("< CUSTOM >", 1, 0, 155, 320, 1, &menuCu
 
 CGameMenuItemTitle itemCustomDifficultyTitle("CUSTOM", 1, 160, 20, 2038);
 CGameMenuItemSlider itemCustomDifficultyEnemyQuantity("ENEMIES QUANTITY:", 3, 66, 40, 180, 2, 0, 4, 1, NULL, -1, -1);
-CGameMenuItemSlider itemCustomDifficultyEnemyHealth("ENEMIES HEALTH:", 3, 66, 51, 180, 2, 0, 4, 1, NULL, -1, -1);
-CGameMenuItemSlider itemCustomDifficultyEnemyDifficulty("ENEMIES DIFFICULTY:", 3, 66, 62, 180, 2, 0, 4, 1, NULL, -1, -1);
-CGameMenuItemSlider itemCustomDifficultyPlayerDamage("PLAYER DAMAGE TAKEN:", 3, 66, 73, 180, 2, 0, 4, 1, NULL, -1, -1);
-CGameMenuItemZCycle itemCustomDifficultyEnemySpeed("ENEMIES SPEED:", 3, 66, 84, 180, 0, 0, pzEnemySpeeds, ARRAY_SSIZE(pzEnemySpeeds), 0);
-CGameMenuItemZBool itemCustomDifficultyEnemyShuffle("RANDOMIZE ENEMY POSITIONS:", 3, 66, 95, 180, false, NULL, NULL, NULL);
-CGameMenuItemZBool itemCustomDifficultyPitchfork("PITCHFORK START:", 3, 66, 106, 180, false, NULL, NULL, NULL);
-CGameMenuItemChain itemCustomDifficultyBannedMonsters("SET MONSTERS", 3, 66, 122, 180, 1, &menuBannedMonsters, -1, NULL, 0);
-CGameMenuItemChain itemCustomDifficultyBannedItems("SET ITEMS", 3, 66, 133, 180, 1, &menuBannedItems, -1, NULL, 0);
+CGameMenuItemSlider itemCustomDifficultyEnemyHealth("ENEMIES HEALTH:", 3, 66, 50, 180, 2, 0, 4, 1, NULL, -1, -1);
+CGameMenuItemSlider itemCustomDifficultyEnemyDifficulty("ENEMIES DIFFICULTY:", 3, 66, 60, 180, 2, 0, 4, 1, NULL, -1, -1);
+CGameMenuItemSlider itemCustomDifficultyPlayerDamage("PLAYER DAMAGE TAKEN:", 3, 66, 70, 180, 2, 0, 4, 1, NULL, -1, -1);
+CGameMenuItemZCycle itemCustomDifficultyEnemySpeed("ENEMIES SPEED:", 3, 66, 80, 180, 0, 0, pzEnemySpeeds, ARRAY_SSIZE(pzEnemySpeeds), 0);
+CGameMenuItemZBool itemCustomDifficultyEnemyShuffle("RANDOMIZE ENEMY POSITIONS:", 3, 66, 90, 180, false, NULL, NULL, NULL);
+CGameMenuItemZBool itemCustomDifficultyPitchfork("PITCHFORK START:", 3, 66, 100, 180, false, NULL, NULL, NULL);
+CGameMenuItemZBool itemCustomDifficultyPermaDeath("PERMANENT DEATH:", 3, 66, 110, 180, false, NULL, NULL, NULL);
+CGameMenuItemChain itemCustomDifficultyBannedMonsters("SET MONSTERS", 3, 66, 123, 180, 1, &menuBannedMonsters, -1, NULL, 0);
+CGameMenuItemChain itemCustomDifficultyBannedItems("SET ITEMS", 3, 66, 134, 180, 1, &menuBannedItems, -1, NULL, 0);
 CGameMenuItemChain itemCustomDifficultyStart("START GAME", 1, 0, 150, 320, 1, NULL, -1, SetCustomDifficultyAndStart, 0);
 
 CGameMenuItemTitle itemBannedMonstersTitle("SET MONSTERS", 1, 160, 20, 2038);
@@ -437,23 +451,38 @@ CGameMenuItemTitle itemNetStartUserMapTitle("USER MAP", 1, 160, 20, 2038);
 CGameMenuFileSelect menuMultiUserMap("", 3, 0, 0, 0, "./", "*.map", zUserMapName);
 
 void SetNetGameMode(CGameMenuItemZCycle *pItem);
+void SetNetMonsterMenu(CGameMenuItemZCycle *pItem);
 
 CGameMenuItemTitle itemNetStartTitle("MULTIPLAYER", 1, 160, 20, 2038);
 CGameMenuItemZCycle itemNetStart1("GAME:", 3, 66, 35, 180, 0, SetNetGameMode, zNetGameTypes, 3, 0);
 CGameMenuItemZCycle itemNetStart2("EPISODE:", 3, 66, 45, 180, 0, SetupNetLevels, NULL, 0, 0);
 CGameMenuItemZCycle itemNetStart3("LEVEL:", 3, 66, 55, 180, 0, NetClearUserMap, NULL, 0, 0);
-CGameMenuItemZCycle itemNetStart4("DIFFICULTY:", 3, 66, 65, 180, 0, 0, zDiffStrings, ARRAY_SSIZE(zDiffStrings), 0);
-CGameMenuItemZCycle itemNetStart5("MONSTERS:", 3, 66, 75, 180, 0, 0, zMonsterStrings, ARRAY_SSIZE(zMonsterStrings), 0);
+CGameMenuItemZCycle itemNetStart4("DIFFICULTY:", 3, 66, 65, 180, 0, SetNetMonsterMenu, zDiffStrings, ARRAY_SSIZE(zDiffStrings), 0);
+CGameMenuItemChain itemNetStart5("MONSTER SETTING:", 3, 66, 75, 320, 0, &menuNetworkGameMonsters, -1, NULL, 0);
 CGameMenuItemZCycle itemNetStart6("WEAPONS:", 3, 66, 85, 180, 0, 0, zWeaponStrings, 4, 0);
 CGameMenuItemZCycle itemNetStart7("ITEMS:", 3, 66, 95, 180, 0, 0, zItemStrings, 3, 0);
 CGameMenuItemZBool itemNetStart8("FRIENDLY FIRE:", 3, 66, 105, 180, true, 0, NULL, NULL);
 CGameMenuItemZCycle itemNetStart9("KEYS SETTING:", 3, 66, 115, 180, 0, 0, zKeyStrings, ARRAY_SSIZE(zKeyStrings), 0);
-CGameMenuItemZBool itemNetStart10("AUTO TEAMS:", 3, 66, 115, 180, true, 0, NULL, NULL);
-CGameMenuItemZCycle itemNetStart11("SPAWN PROTECTION:", 3, 66, 125, 180, 0, 0, zSpawnProtectStrings, ARRAY_SSIZE(zSpawnProtectStrings), 0);
-CGameMenuItemZCycle itemNetStart12("SPAWN WITH WEAPON:", 3, 66, 135, 180, 0, 0, zSpawnWeaponStrings, ARRAY_SSIZE(zSpawnWeaponStrings), 0);
-CGameMenuItemChain itemNetStart13("USER MAP", 3, 66, 150, 320, 0, &menuMultiUserMaps, 0, NULL, 0);
-CGameMenuItemChain itemNetStart14("MUTATORS", 3, 66, 160, 320, 0, &menuNetworkGameMutators, -1, NULL, 0);
-CGameMenuItemChain itemNetStart15("START GAME", 1, 0, 175, 320, 1, 0, -1, StartNetGame, 0);
+CGameMenuItemZBool itemNetStart10("ITEM/WEAPON SETTING:", 3, 66, 125, 180, false, NULL, "KEEP ON DEATH", "LOST ON DEATH");
+CGameMenuItemZBool itemNetStart11("AUTO TEAMS:", 3, 66, 115, 180, true, 0, NULL, NULL);
+CGameMenuItemZCycle itemNetStart12("SPAWN PROTECTION:", 3, 66, 135, 180, 0, 0, zSpawnProtectStrings, ARRAY_SSIZE(zSpawnProtectStrings), 0);
+CGameMenuItemZCycle itemNetStart13("SPAWN WITH WEAPON:", 3, 66, 145, 180, 0, 0, zSpawnWeaponStrings, ARRAY_SSIZE(zSpawnWeaponStrings), 0);
+CGameMenuItemChain itemNetStart14("USER MAP", 3, 66, 155, 320, 0, &menuMultiUserMaps, 0, NULL, 0);
+CGameMenuItemChain itemNetStart15("MUTATORS", 3, 66, 165, 320, 0, &menuNetworkGameMutators, -1, NULL, 0);
+CGameMenuItemChain itemNetStart16("START GAME", 1, 0, 175, 320, 1, 0, -1, StartNetGame, 0);
+
+CGameMenuItemZCycle itemNetMonsterSettings("MONSTERS:", 3, 66, 40, 180, 0, SetNetMonsterMenu, zMonsterStrings, ARRAY_SSIZE(zMonsterStrings), 0);
+CGameMenuItemSlider itemNetMonsterQuantity("MONSTER QUANTITY:", 3, 66, 50, 180, 2, 0, 4, 1, NULL, -1, -1);
+CGameMenuItemSlider itemNetMonsterHealth("MONSTER HEALTH:", 3, 66, 60, 180, 2, 0, 4, 1, NULL, -1, -1);
+CGameMenuItemZCycle itemNetMonsterSpeed("MONSTER SPEED:", 3, 66, 70, 180, 0, 0, pzEnemySpeeds, ARRAY_SSIZE(pzEnemySpeeds), 0);
+CGameMenuItemZBool itemNetMonsterBats("BATS:", 3, 75, 90, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterRats("RATS:", 3, 75, 98, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterFish("FISH:", 3, 75, 106, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterHands("HANDS:", 3, 75, 114, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterGhosts("GHOSTS:", 3, 75, 122, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterSpiders("SPIDERS:", 3, 75, 130, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterTinyCaleb("TINY CALEBS:", 3, 75, 138, 161, false, NULL, "REMOVE", "KEEP");
+CGameMenuItemZBool itemNetMonsterHellHounds("HELL HOUNDS:", 3, 75, 146, 161, false, NULL, "REMOVE", "KEEP");
 
 ///////////////
 CGameMenuItemChain itemNetMutatorBannedItems("SET ITEMS", 3, 0, 37, 320, 1, &menuBannedItems, -1, NULL, 0);
@@ -462,7 +491,7 @@ CGameMenuItemZBool itemNetMutatorBoolDamageInvul("HITSCAN DAMAGE INVULNERABILITY
 CGameMenuItemZCycle itemNetMutatorExplosionBehavior("EXPLOSIONS BEHAVIOR:", 3, 66, 70, 180, 0, NULL, pzExplosionBehaviorStrings, ARRAY_SSIZE(pzExplosionBehaviorStrings), 0);
 CGameMenuItemZCycle itemNetMutatorProjectileBehavior("PROJECTILES BEHAVIOR:", 3, 66, 80, 180, 0, NULL, pzProjectileBehaviorStrings, ARRAY_SSIZE(pzProjectileBehaviorStrings), 0);
 CGameMenuItemZBool itemNetMutatorNapalmFalloff("NAPALM GRAVITY FALLOFF:", 3, 66, 90, 180, false, NULL, NULL, NULL);
-CGameMenuItemZBool itemNetMutatorEnemyBehavior("ENEMY BEHAVIOR:", 3, 66, 100, 180, false, NULL, "NOTBLOOD", "ORIGINAL");
+CGameMenuItemZBool itemNetMutatorEnemyBehavior("ENEMY BEHAVIOR:", 3, 66, 100, 180, false, NULL, "NBLOOD", "ORIGINAL");
 CGameMenuItemZBool itemNetMutatorBoolEnemyRandomTNT("RANDOM CULTIST TNT:", 3, 66, 110, 180, false, NULL, NULL, NULL);
 CGameMenuItemZCycle itemNetMutatorWeaponsVer("WEAPON BEHAVIOR:", 3, 66, 120, 180, 0, NULL, pzWeaponsVersionStrings, ARRAY_SSIZE(pzWeaponsVersionStrings), 0);
 CGameMenuItemZBool itemNetMutatorSectorBehavior("SECTOR BEHAVIOR:", 3, 66, 130, 180, false, NULL, "NOTBLOOD", "ORIGINAL");
@@ -619,7 +648,7 @@ CGameMenuItemZBool itemMutatorBoolDamageInvul("HITSCAN DAMAGE INVULNERABILITY:",
 CGameMenuItemZCycle itemMutatorExplosionBehavior("EXPLOSIONS BEHAVIOR:", 3, 66, 65, 180, 0, SetExplosionBehavior, pzExplosionBehaviorStrings, ARRAY_SSIZE(pzExplosionBehaviorStrings), 0);
 CGameMenuItemZCycle itemMutatorProjectileBehavior("PROJECTILES BEHAVIOR:", 3, 66, 75, 180, 0, SetProjectileBehavior, pzProjectileBehaviorStrings, ARRAY_SSIZE(pzProjectileBehaviorStrings), 0);
 CGameMenuItemZBool itemMutatorNapalmFalloff("NAPALM GRAVITY FALLOFF:", 3, 66, 85, 180, false, SetNapalmFalloff, NULL, NULL);
-CGameMenuItemZBool itemMutatorEnemyBehavior("ENEMY BEHAVIOR:", 3, 66, 95, 180, false, SetEnemyBehavior, "NOTBLOOD", "ORIGINAL");
+CGameMenuItemZBool itemMutatorEnemyBehavior("ENEMY BEHAVIOR:", 3, 66, 95, 180, false, SetEnemyBehavior, "NBLOOD", "ORIGINAL");
 CGameMenuItemZBool itemMutatorBoolEnemyRandomTNT("RANDOM CULTIST TNT:", 3, 66, 105, 180, false, SetEnemyRandomTNT, NULL, NULL);
 CGameMenuItemZCycle itemMutatorWeaponsVer("WEAPON BEHAVIOR:", 3, 66, 115, 180, 0, SetWeaponsVer, pzWeaponsVersionStrings, ARRAY_SSIZE(pzWeaponsVersionStrings), 0);
 CGameMenuItemZBool itemMutatorSectorBehavior("SECTOR BEHAVIOR:", 3, 66, 125, 180, false, SetSectorBehavior, "NOTBLOOD", "ORIGINAL");
@@ -649,7 +678,7 @@ CGameMenuItemZBool itemOptionsDisplayBoolShowMapTitle("MAP TITLE:", 3, 66, 120, 
 CGameMenuItemZBool itemOptionsDisplayBoolMessages("MESSAGES:", 3, 66, 130, 180, gMessageState, SetMessages, NULL, NULL);
 CGameMenuItemZBool itemOptionsDisplayBoolWidescreen("WIDESCREEN:", 3, 66, 140, 180, r_usenewaspect, SetWidescreen, NULL, NULL);
 CGameMenuItemZCycle itemOptionsDisplayWeaponSelect("SHOW WEAPON SELECT:", 3, 66, 150, 180, 0, SetWeaponSelectMode, pzWeaponSelectStrings, ARRAY_SSIZE(pzWeaponSelectStrings), 0);
-CGameMenuItemSlider itemOptionsDisplayFOV("FOV:", 3, 66, 160, 180, &gFov, 75, 170, 1, SetFOV, -1, -1, kMenuSliderValue);
+CGameMenuItemSlider itemOptionsDisplayFOV("FOV:", 3, 66, 160, 180, &gFov, 75, 140, 1, SetFOV, -1, -1, kMenuSliderValue);
 #ifdef USE_OPENGL
 CGameMenuItemChain itemOptionsDisplayPolymost("POLYMOST SETUP", 3, 66, 180, 180, 0, &menuOptionsDisplayPolymost, -1, SetupVideoPolymostMenu, 0);
 #endif
@@ -698,6 +727,12 @@ const int nFrameLimitValues[] = {
     240
 };
 
+const char *pzInvertPaletteStrings[] = {
+    "OFF",
+    "ON",
+    "INVERT TWICE",
+};
+
 
 void PreDrawVideoModeMenu(CGameMenuItem *);
 
@@ -716,10 +751,10 @@ CGameMenuItemTitle itemOptionsDisplayColorTitle("COLOR CORRECTION", 1, 160, 20, 
 CGameMenuItemZCycle itemOptionsDisplayColorPaletteCustom("PALETTE:", 3, 66, 60, 180, 0, UpdateVideoPaletteCycleMenu, srcCustomPaletteStr, ARRAY_SSIZE(srcCustomPaletteStr), 0);
 CGameMenuItemZBool itemOptionsDisplayColorPaletteCIEDE2000("CIEDE2000 COMPARE:", 3, 66, 70, 180, 0, UpdateVideoPaletteBoolMenu, NULL, NULL);
 CGameMenuItemZBool itemOptionsDisplayColorPaletteGrayscale("GRAYSCALE PALETTE:", 3, 66, 80, 180, 0, UpdateVideoPaletteBoolMenu, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayColorPaletteInvert("INVERT PALETTE:", 3, 66, 90, 180, 0, UpdateVideoPaletteBoolMenu, NULL, NULL);
-CGameMenuItemSliderFloat itemOptionsDisplayColorGamma("GAMMA:", 3, 66, 100, 180, &g_videoGamma, 0.3f, 4.f, 0.1f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
-CGameMenuItemSliderFloat itemOptionsDisplayColorContrast("CONTRAST:", 3, 66, 110, 180, &g_videoContrast, 0.1f, 2.7f, 0.05f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
-CGameMenuItemSliderFloat itemOptionsDisplayColorBrightness("BRIGHTNESS:", 3, 66, 120, 180, &g_videoBrightness, -0.8f, 0.8f, 0.05f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
+CGameMenuItemZCycle itemOptionsDisplayColorPaletteInvert("INVERT PALETTE:", 3, 66, 90, 180, 0, UpdateVideoPaletteCycleMenu, pzInvertPaletteStrings, ARRAY_SSIZE(pzInvertPaletteStrings), NULL);
+CGameMenuItemSliderFloat itemOptionsDisplayColorGamma("GAMMA:", 3, 66, 100, 180, &g_videoGamma, MIN_GAMMA, MAX_GAMMA, 0.1f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
+CGameMenuItemSliderFloat itemOptionsDisplayColorContrast("CONTRAST:", 3, 66, 110, 180, &g_videoContrast, MIN_CONTRAST, MAX_CONTRAST, 0.05f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
+CGameMenuItemSliderFloat itemOptionsDisplayColorSaturation("SATURATION:", 3, 66, 120, 180, &g_videoSaturation, MIN_SATURATION, MAX_SATURATION, 0.05f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
 CGameMenuItemSliderFloat itemOptionsDisplayColorVisibility("VISIBILITY:", 3, 66, 130, 180, &r_ambientlight, 0.125f, 4.f, 0.125f, UpdateVideoColorMenu, -1, -1, kMenuSliderValue);
 CGameMenuItemChain itemOptionsDisplayColorReset("RESET TO DEFAULTS", 3, 66, 150, 180, 0, NULL, 0, ResetVideoColor, 0);
 
@@ -949,6 +984,12 @@ void SetJoystickDigitalNeg(CGameMenuItemZCycle* pItem);
 void SetJoystickDeadzone(CGameMenuItemSlider* pItem);
 void SetJoystickSaturate(CGameMenuItemSlider* pItem);
 
+const char *pzTurnAccelerationStrings[] = {
+    "OFF",
+    "ON RUNNING",
+    "ALWAYS ON",
+};
+
 CGameMenuItemTitle itemOptionsControlTitle("CONTROL SETUP", 1, 160, 20, 2038);
 CGameMenuItemChain itemOptionsControlKeyboard("KEYBOARD SETUP", 1, 0, 60, 320, 1, &menuOptionsControlKeyboard, -1, NULL, 0);
 CGameMenuItemChain itemOptionsControlMouse("MOUSE SETUP", 1, 0, 80, 320, 1, &menuOptionsControlMouse, -1, SetupMouseMenu, 0);
@@ -958,11 +999,12 @@ CGameMenuItemChain itemOptionsControlJoystickMisc("JOYSTICK MISC SETUP", 1, 0, 1
 
 CGameMenuItemTitle itemOptionsControlKeyboardTitle("KEYBOARD SETUP", 1, 160, 20, 2038);
 CGameMenuItemSlider itemOptionsControlKeyboardSliderTurnSpeed("Key Turn Speed:", 1, 18, 50, 280, &gTurnSpeed, 64, 128, 4, SetTurnSpeed, -1, -1);
-CGameMenuItemZBool itemOptionsControlKeyboardBoolCrouchToggle("Crouch Toggle:", 1, 18, 70, 280, gCrouchToggle, SetCrouchToggle, NULL, NULL);
-CGameMenuItemZBool itemOptionsControlKeyboardBoolAutoRun("Always Run:", 1, 18, 90, 280, gAutoRun, SetAutoRun, NULL, NULL);
-CGameMenuItemChain itemOptionsControlKeyboardList("Configure Keys...", 1, 0, 125, 320, 1, &menuKeys, -1, NULL, 0);
-CGameMenuItemChain itemOptionsControlKeyboardReset("Reset Keys (default)...", 1, 0, 145, 320, 1, &menuKeys, -1, ResetKeys, 0);
-CGameMenuItemChain itemOptionsControlKeyboardResetClassic("Reset Keys (classic)...", 1, 0, 165, 320, 1, &menuKeys, -1, ResetKeysClassic, 0);
+CGameMenuItemZCycle itemOptionsControlKeyboardCycleTurnAcceleration("Key Turn Acceleration:", 1, 18, 70, 280, 0, SetTurnAcceleration, pzTurnAccelerationStrings, ARRAY_SIZE(pzTurnAccelerationStrings), 0);
+CGameMenuItemZBool itemOptionsControlKeyboardBoolCrouchToggle("Crouch Toggle:", 1, 18, 90, 280, gCrouchToggle, SetCrouchToggle, NULL, NULL);
+CGameMenuItemZBool itemOptionsControlKeyboardBoolAutoRun("Always Run:", 1, 18, 110, 280, gAutoRun, SetAutoRun, NULL, NULL);
+CGameMenuItemChain itemOptionsControlKeyboardList("Configure Keys...", 1, 0, 135, 320, 1, &menuKeys, -1, NULL, 0);
+CGameMenuItemChain itemOptionsControlKeyboardReset("Reset Keys (default)...", 1, 0, 155, 320, 1, &menuKeys, -1, ResetKeys, 0);
+CGameMenuItemChain itemOptionsControlKeyboardResetClassic("Reset Keys (classic)...", 1, 0, 175, 320, 1, &menuKeys, -1, ResetKeysClassic, 0);
 
 CGameMenuItemTitle itemKeysTitle("KEY SETUP", 1, 160, 20, 2038);
 CGameMenuItemKeyList itemKeyList("", 3, 56, 40, 200, 16, NUMGAMEFUNCTIONS, 0);
@@ -1114,7 +1156,6 @@ void SetupDifficultyMenu(void)
     menuDifficulty.Add(&itemDifficulty5, false);
     menuDifficulty.Add(&itemDifficultyCustom, false);
     menuDifficulty.Add(&itemBloodQAV, false);
-    itemDifficultyCustom.bDisableForNet = 1;
 
     menuCustomDifficulty.Add(&itemCustomDifficultyTitle, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyEnemyQuantity, true);
@@ -1124,6 +1165,7 @@ void SetupDifficultyMenu(void)
     menuCustomDifficulty.Add(&itemCustomDifficultyEnemySpeed, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyEnemyShuffle, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyPitchfork, false);
+    menuCustomDifficulty.Add(&itemCustomDifficultyPermaDeath, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyBannedMonsters, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyBannedItems, false);
     menuCustomDifficulty.Add(&itemCustomDifficultyStart, false);
@@ -1135,6 +1177,7 @@ void SetupDifficultyMenu(void)
     itemCustomDifficultyEnemySpeed.tooltip_pzTextUpper = "Set enemy's movement speed modifier";
     itemCustomDifficultyEnemyShuffle.tooltip_pzTextUpper = "Shuffle enemy's spawn position";
     itemCustomDifficultyPitchfork.tooltip_pzTextUpper = "Player will lose all items on new level";
+    itemCustomDifficultyPermaDeath.tooltip_pzTextUpper = "No saving, and you only live once";
     itemCustomDifficultyBannedMonsters.tooltip_pzTextUpper = "Set which monsters to spawn";
     itemCustomDifficultyBannedItems.tooltip_pzTextUpper = "Set which items to spawn";
 
@@ -1248,6 +1291,10 @@ void SetupMainMenu(void)
     menuMain.Add(&itemMain6, false);
     menuMain.Add(&itemMain7, false);
     menuMain.Add(&itemBloodQAV, false);
+
+#ifdef NETCODE_DISABLE
+    itemMain2.bEnable = 0; // disable multiplayer menu item for non-netcode build
+#endif
 }
 
 void SetupMainMenuWithSave(void)
@@ -1273,7 +1320,7 @@ void SetupMainMenuWithSave(void)
     menuMainWithSave.Add(&itemMainSave8, false);
     menuMainWithSave.Add(&itemBloodQAV, false);
 
-    itemMainSave3.bDisableForNet = 1;
+    itemMainSave3.bDisableForNet = itemMainSave3.bDisableForPermaDeath = 1;
     itemMainSave4.bDisableForNet = 1;
     itemMainSave5.bDisableForNet = 1;
     itemMainSave6.bDisableForNet = 1;
@@ -1305,8 +1352,24 @@ void SetupNetStartMenu(void)
     menuNetStart.Add(&itemNetStart13, false);
     menuNetStart.Add(&itemNetStart14, false);
     menuNetStart.Add(&itemNetStart15, false);
+    menuNetStart.Add(&itemNetStart16, false);
     menuMultiUserMaps.Add(&itemNetStartUserMapTitle, true);
     menuMultiUserMaps.Add(&menuMultiUserMap, true);
+
+    menuNetworkGameMonsters.Add(&itemCustomDifficultyTitle, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterSettings, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterQuantity, true);
+    menuNetworkGameMonsters.Add(&itemNetMonsterHealth, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterSpeed, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterBats, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterRats, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterFish, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterHands, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterGhosts, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterSpiders, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterTinyCaleb, false);
+    menuNetworkGameMonsters.Add(&itemNetMonsterHellHounds, false);
+    menuNetworkGameMonsters.Add(&itemBloodQAV, false);
 
     //////////////////////
     menuNetworkGameMutators.Add(&itemGameMutatorsTitle, false);
@@ -1353,12 +1416,14 @@ void SetupNetStartMenu(void)
     SetupLevelMenuItem(gMultiEpisodeInit != -1 ? gMultiEpisodeInit : 0);
     itemNetStart3.SetTextIndex(gMultiLevelInit != -1 ? gMultiLevelInit : 0);
     itemNetStart4.SetTextIndex(gMultiDiffInit != -1 ? gMultiDiffInit : 2);
-    itemNetStart5.SetTextIndex(gMultiMonsters != -1 ? gMultiMonsters : 0);
     itemNetStart6.SetTextIndex(gMultiWeapons != -1 ? gMultiWeapons : 1);
     itemNetStart7.SetTextIndex(gMultiItems != -1 ? gMultiItems : 1);
-    itemNetStart10.at20 = !gPlayerTeamPreference;
-    itemNetStart11.SetTextIndex(1);
+    itemNetStart11.at20 = !gPlayerTeamPreference;
+    itemNetStart12.SetTextIndex(1);
     SetNetGameMode(&itemNetStart1); // hide friendly fire/keys menu items depending on game mode
+
+    itemNetMonsterSettings.SetTextIndex(gMultiMonsters != -1 ? gMultiMonsters : 0);
+    SetNetMonsterMenu(NULL);
 
     ///////
     itemNetMutatorBoolQuadDamagePowerup.at20 = !!gQuadDamagePowerup;
@@ -1702,7 +1767,7 @@ void SetupOptionsMenu(void)
     menuOptionsDisplayColor.Add(&itemOptionsDisplayColorPaletteInvert, false);
     menuOptionsDisplayColor.Add(&itemOptionsDisplayColorGamma, false);
     menuOptionsDisplayColor.Add(&itemOptionsDisplayColorContrast, false);
-    menuOptionsDisplayColor.Add(&itemOptionsDisplayColorBrightness, false);
+    menuOptionsDisplayColor.Add(&itemOptionsDisplayColorSaturation, false);
     menuOptionsDisplayColor.Add(&itemOptionsDisplayColorVisibility, false);
     menuOptionsDisplayColor.Add(&itemOptionsDisplayColorReset, false);
     menuOptionsDisplayColor.Add(&itemBloodQAV, false);
@@ -1710,9 +1775,9 @@ void SetupOptionsMenu(void)
     itemOptionsDisplayColorPaletteCustom.m_nFocus = gCustomPalette % ARRAY_SSIZE(srcCustomPaletteStr);
     itemOptionsDisplayColorPaletteCIEDE2000.at20 = gCustomPaletteCIEDE2000;
     itemOptionsDisplayColorPaletteGrayscale.at20 = gCustomPaletteGrayscale;
-    itemOptionsDisplayColorPaletteInvert.at20 = gCustomPaletteInvert;
+    itemOptionsDisplayColorPaletteInvert.m_nFocus = gCustomPaletteInvert % ARRAY_SSIZE(pzInvertPaletteStrings);
     itemOptionsDisplayColorContrast.pPreDrawCallback = PreDrawDisplayColor;
-    itemOptionsDisplayColorBrightness.pPreDrawCallback = PreDrawDisplayColor;
+    itemOptionsDisplayColorSaturation.pPreDrawCallback = PreDrawDisplayColor;
 
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewTitle, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewHudSize, true);
@@ -1838,6 +1903,7 @@ void SetupControlsMenu(void)
 
     menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardTitle, false);
     menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardSliderTurnSpeed, true);
+    menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardCycleTurnAcceleration, false);
     menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardBoolCrouchToggle, false);
     menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardBoolAutoRun, false);
     menuOptionsControlKeyboard.Add(&itemOptionsControlKeyboardList, false);
@@ -1846,6 +1912,7 @@ void SetupControlsMenu(void)
     menuOptionsControlKeyboard.Add(&itemBloodQAV, false);
 
     itemOptionsControlKeyboardSliderTurnSpeed.nValue = gTurnSpeed;
+    itemOptionsControlKeyboardCycleTurnAcceleration.m_nFocus = gTurnAcceleration % ARRAY_SSIZE(pzTurnAccelerationStrings);
     itemOptionsControlKeyboardBoolCrouchToggle.at20 = gCrouchToggle;
     itemOptionsControlKeyboardBoolAutoRun.at20 = gAutoRun;
 
@@ -2357,6 +2424,11 @@ void SetJoystickRumble(CGameMenuItemZBool *pItem)
     gSetup.joystickrumble = pItem->at20;
 }
 
+void SetTurnAcceleration(CGameMenuItemZCycle *pItem)
+{
+    gTurnAcceleration = pItem->m_nFocus % ARRAY_SSIZE(pzTurnAccelerationStrings);
+}
+
 void SetCrouchToggle(CGameMenuItemZBool *pItem)
 {
     gCrouchToggle = itemOptionsControlKeyboardBoolCrouchToggle.at20 = itemOptionsControlJoystickMiscCrouchToggle.at20 = pItem->at20;
@@ -2497,6 +2569,26 @@ inline unsigned int SetBannedSprites(char bSinglePlayer)
         if (itemBannedMonstersHellHounds.at20)
             uSpriteBannedFlags |= BANNED_HHOUNDS;
     }
+    else // load from network monster menu
+    {
+        // monsters
+        if (itemNetMonsterBats.at20)
+            uSpriteBannedFlags |= BANNED_BATS;
+        if (itemNetMonsterRats.at20)
+            uSpriteBannedFlags |= BANNED_RATS;
+        if (itemNetMonsterFish.at20)
+            uSpriteBannedFlags |= BANNED_FISH;
+        if (itemNetMonsterHands.at20)
+            uSpriteBannedFlags |= BANNED_HANDS;
+        if (itemNetMonsterGhosts.at20)
+            uSpriteBannedFlags |= BANNED_GHOSTS;
+        if (itemNetMonsterSpiders.at20)
+            uSpriteBannedFlags |= BANNED_SPIDERS;
+        if (itemNetMonsterTinyCaleb.at20)
+            uSpriteBannedFlags |= BANNED_TCALEBS;
+        if (itemNetMonsterHellHounds.at20)
+            uSpriteBannedFlags |= BANNED_HHOUNDS;
+    }
 
     // weapons
     if (itemBannedItemsFlare.at20)
@@ -2563,6 +2655,7 @@ void SetDifficultyAndStart(CGameMenuItemChain *pItem)
     gGameOptions.nEnemySpeed = 0;
     gGameOptions.bEnemyShuffle = false;
     gGameOptions.bPitchforkOnly = false;
+    gGameOptions.bPermaDeath = false;
     gGameOptions.uSpriteBannedFlags = BANNED_NONE;
     gGameOptions.nLevel = 0;
     if (!gVanilla) // don't reset gameflags for vanilla mode
@@ -2595,6 +2688,7 @@ void SetCustomDifficultyAndStart(CGameMenuItemChain *pItem)
     gGameOptions.nEnemySpeed = ClipRange(itemCustomDifficultyEnemySpeed.m_nFocus, 0, 4);
     gGameOptions.bEnemyShuffle = !!itemCustomDifficultyEnemyShuffle.at20;
     gGameOptions.bPitchforkOnly = !!itemCustomDifficultyPitchfork.at20;
+    gGameOptions.bPermaDeath = !!itemCustomDifficultyPermaDeath.at20;
     gGameOptions.uSpriteBannedFlags = SetBannedSprites(1);
     gGameOptions.nLevel = 0;
     if (!gVanilla) // don't reset gameflags for vanilla mode
@@ -2704,9 +2798,10 @@ void SetupVideoModeMenu(CGameMenuItemChain *pItem)
             break;
         }
     }
+    const int kMaxFps = r_maxfps == -1 ? refreshfreq : r_maxfps;
     for (int i = 0; i < 8; i++)
     {
-        if (r_maxfps == nFrameLimitValues[i])
+        if (kMaxFps == nFrameLimitValues[i])
         {
             itemOptionsDisplayModeFrameLimit.m_nFocus = i;
             break;
@@ -2742,7 +2837,7 @@ void UpdateVideoColorMenu(CGameMenuItemSliderFloat *pItem)
     UNREFERENCED_PARAMETER(pItem);
     g_videoGamma = itemOptionsDisplayColorGamma.fValue;
     g_videoContrast = itemOptionsDisplayColorContrast.fValue;
-    g_videoBrightness = itemOptionsDisplayColorBrightness.fValue;
+    g_videoSaturation = itemOptionsDisplayColorSaturation.fValue;
     r_ambientlight = itemOptionsDisplayColorVisibility.fValue;
     r_ambientlightrecip = 1.f/r_ambientlight;
     gBrightness = GAMMA_CALC<<2;
@@ -2766,7 +2861,9 @@ void UpdateVideoPalette(void)
 
 void UpdateVideoPaletteCycleMenu(CGameMenuItemZCycle *pItem)
 {
-    gCustomPalette = pItem->m_nFocus % ARRAY_SSIZE(srcCustomPaletteStr);
+    UNREFERENCED_PARAMETER(pItem);
+    gCustomPalette = itemOptionsDisplayColorPaletteCustom.m_nFocus % ARRAY_SSIZE(srcCustomPaletteStr);
+    gCustomPaletteInvert = itemOptionsDisplayColorPaletteInvert.m_nFocus % ARRAY_SSIZE(pzInvertPaletteStrings);
     UpdateVideoPalette();
 }
 
@@ -2775,7 +2872,6 @@ void UpdateVideoPaletteBoolMenu(CGameMenuItemZBool *pItem)
     UNREFERENCED_PARAMETER(pItem);
     gCustomPaletteCIEDE2000 = itemOptionsDisplayColorPaletteCIEDE2000.at20;
     gCustomPaletteGrayscale = itemOptionsDisplayColorPaletteGrayscale.at20;
-    gCustomPaletteInvert = itemOptionsDisplayColorPaletteInvert.at20;
     UpdateVideoPalette();
 }
 
@@ -2783,7 +2879,7 @@ void PreDrawDisplayColor(CGameMenuItem *pItem)
 {
     if (pItem == &itemOptionsDisplayColorContrast)
         pItem->bEnable = gammabrightness;
-    else if (pItem == &itemOptionsDisplayColorBrightness)
+    else if (pItem == &itemOptionsDisplayColorSaturation)
         pItem->bEnable = gammabrightness;
 }
 
@@ -2792,13 +2888,13 @@ void ResetVideoColor(CGameMenuItemChain *pItem)
     UNREFERENCED_PARAMETER(pItem);
     g_videoGamma = DEFAULT_GAMMA;
     g_videoContrast = DEFAULT_CONTRAST;
-    g_videoBrightness = DEFAULT_BRIGHTNESS;
+    g_videoSaturation = DEFAULT_SATURATION;
     gBrightness = 0;
     r_ambientlight = r_ambientlightrecip = 1.f;
     gCustomPalette = itemOptionsDisplayColorPaletteCustom.m_nFocus = 0;
     gCustomPaletteCIEDE2000 = itemOptionsDisplayColorPaletteCIEDE2000.at20 = 0;
     gCustomPaletteGrayscale = itemOptionsDisplayColorPaletteGrayscale.at20 = 0;
-    gCustomPaletteInvert = itemOptionsDisplayColorPaletteInvert.at20 = 0;
+    gCustomPaletteInvert = itemOptionsDisplayColorPaletteInvert.m_nFocus = 0;
     scrCustomizePalette(gCustomPalette % ARRAY_SSIZE(srcCustomPaletteStr), gCustomPaletteCIEDE2000, gCustomPaletteGrayscale, gCustomPaletteInvert);
     videoSetPalette(gBrightness>>2, gLastPal, 0);
 #ifdef USE_OPENGL
@@ -2941,8 +3037,32 @@ void SetNetGameMode(CGameMenuItemZCycle *pItem)
     itemNetStart8.bNoDraw = !itemNetStart8.bEnable;
     itemNetStart9.bEnable = (pItem->m_nFocus+1) == kGameTypeCoop;
     itemNetStart9.bNoDraw = !itemNetStart9.bEnable;
-    itemNetStart10.bEnable = (pItem->m_nFocus+1) == kGameTypeTeams;
+    itemNetStart10.bEnable = (pItem->m_nFocus+1) == kGameTypeCoop;
     itemNetStart10.bNoDraw = !itemNetStart10.bEnable;
+    itemNetStart11.bEnable = (pItem->m_nFocus+1) == kGameTypeTeams;
+    itemNetStart11.bNoDraw = !itemNetStart11.bEnable;
+}
+
+void SetNetMonsterMenu(CGameMenuItemZCycle *pItem)
+{
+    itemNetStart5.m_pzText = zMonsterMenuStrings[itemNetMonsterSettings.m_nFocus];
+
+    if ((pItem == &itemNetStart4) || !pItem)
+    {
+        itemNetMonsterQuantity.nValue = itemNetStart4.m_nFocus;
+        itemNetMonsterHealth.nValue = itemNetStart4.m_nFocus;
+    }
+
+    for (int i = 0; i < menuNetworkGameMonsters.m_nItems; i++)
+    {
+        if (menuNetworkGameMonsters.pItemList[i] == &itemNetMonsterSettings)
+            continue;
+        if (menuNetworkGameMonsters.pItemList[i] == &itemBloodQAV)
+            continue;
+        if (menuNetworkGameMonsters.pItemList[i] == &itemCustomDifficultyTitle)
+            continue;
+        menuNetworkGameMonsters.pItemList[i]->bEnable = itemNetMonsterSettings.m_nFocus != 0;
+    }
 }
 
 void UpdateSoundToggle(CGameMenuItemZBool *pItem)
@@ -3546,8 +3666,11 @@ void SaveGame(CGameMenuItemZEditBitmap *pItem, CGameMenuEvent *event)
     memset(gGameOptions.szSaveGameName, 0, sizeof(gGameOptions.szSaveGameName));
     sprintf(gGameOptions.szSaveGameName, "%s", strSaveGameName);
     gGameOptions.nSaveGameSlot = nSlot;
-    viewLoadingScreen(gMenuPicnum, "Saving", "Saving Your Game", strRestoreGameStrings[nSlot]);
-    videoNextPage();
+    if (gShowLoadingSavingBackground)
+    {
+        viewLoadingScreen(gMenuPicnum, "Saving", "Saving Your Game", strRestoreGameStrings[nSlot]);
+        videoNextPage();
+    }
     gSaveGameNum = nSlot;
     LoadSave::SaveGame(strSaveGameName);
     gGameOptions.picEntry = gSavedOffset;
@@ -3575,8 +3698,11 @@ void QuickSaveGame(void)
     memset(gGameOptions.szSaveGameName, 0, sizeof(gGameOptions.szSaveGameName));
     sprintf(gGameOptions.szSaveGameName, "%s", strSaveGameName);
     gGameOptions.nSaveGameSlot = kLoadSaveSlotQuick;
-    viewLoadingScreen(gMenuPicnum, "Saving", "Saving Your Game", strRestoreGameStrings[kLoadSaveSlotQuick]);
-    videoNextPage();
+    if (gShowLoadingSavingBackground)
+    {
+        viewLoadingScreen(gMenuPicnum, "Saving", "Saving Your Game", strRestoreGameStrings[kLoadSaveSlotQuick]);
+        videoNextPage();
+    }
     LoadSave::SaveGame(strSaveGameName);
     gGameOptions.picEntry = gSavedOffset;
     gSaveGameOptions[kLoadSaveSlotQuick] = gGameOptions;
@@ -3629,8 +3755,11 @@ void LoadGame(CGameMenuItemZEditBitmap *pItem, CGameMenuEvent *event)
         return;
     if (!gGameStarted || LoadSavedInCurrentSession(nSlot)) // if save slot is from a different session, set autosave state to false
         gAutosaveInCurLevel = false;
-    viewLoadingScreen(gMenuPicnum, "Loading", "Loading Saved Game", strRestoreGameStrings[nSlot]);
-    videoNextPage();
+    if (gShowLoadingSavingBackground)
+    {
+        viewLoadingScreen(gMenuPicnum, "Loading", "Loading Saved Game", strRestoreGameStrings[nSlot]);
+        videoNextPage();
+    }
     LoadSave::LoadGame(strLoadGameName);
     gGameMenuMgr.Deactivate();
     gQuickLoadSlot = nSlot;
@@ -3649,8 +3778,11 @@ void QuickLoadGame(void)
         return;
     if (!LoadSavedInCurrentSession(gQuickLoadSlot)) // if save slot is from a different session, set autosave state to false
         gAutosaveInCurLevel = false;
-    viewLoadingScreen(gMenuPicnum, "Loading", "Loading Saved Game", strRestoreGameStrings[gQuickLoadSlot]);
-    videoNextPage();
+    if (gShowLoadingSavingBackground)
+    {
+        viewLoadingScreen(gMenuPicnum, "Loading", "Loading Saved Game", strRestoreGameStrings[gQuickLoadSlot]);
+        videoNextPage();
+    }
     LoadSave::LoadGame(strLoadGameName);
     gGameMenuMgr.Deactivate();
 }
@@ -3682,15 +3814,21 @@ void StartNetGame(CGameMenuItemChain *pItem)
     gPacketStartGame.episodeId = itemNetStart2.m_nFocus;
     gPacketStartGame.levelId = itemNetStart3.m_nFocus;
     gPacketStartGame.difficulty = itemNetStart4.m_nFocus;
-    gPacketStartGame.monsterSettings = itemNetStart5.m_nFocus;
     gPacketStartGame.weaponSettings = itemNetStart6.m_nFocus;
     gPacketStartGame.itemSettings = itemNetStart7.m_nFocus;
     gPacketStartGame.respawnSettings = 0;
     gPacketStartGame.bFriendlyFire = itemNetStart8.at20;
     gPacketStartGame.keySettings = itemNetStart9.m_nFocus;
-    gPacketStartGame.bAutoTeams = itemNetStart10.at20;
-    gPacketStartGame.nSpawnProtection = itemNetStart11.m_nFocus;
-    gPacketStartGame.nSpawnWeapon = itemNetStart12.m_nFocus;
+    gPacketStartGame.itemWeaponSettings = itemNetStart10.at20;
+    gPacketStartGame.bAutoTeams = itemNetStart11.at20;
+    gPacketStartGame.nSpawnProtection = itemNetStart12.m_nFocus;
+    gPacketStartGame.nSpawnWeapon = itemNetStart13.m_nFocus;
+
+    gPacketStartGame.monsterSettings = itemNetMonsterSettings.m_nFocus;
+    gPacketStartGame.monsterQuantity = ClipRange(itemNetMonsterQuantity.nValue, 0, 4);
+    gPacketStartGame.monsterHealth = ClipRange(itemNetMonsterHealth.nValue, 0, 4);
+    gPacketStartGame.monsterSpeed = ClipRange(itemNetMonsterSpeed.m_nFocus, 0, 4);
+
     ////
     SetGameVanillaMode(0); // turn off vanilla mode for multiplayer so menus don't get bugged
     gPacketStartGame.bQuadDamagePowerup = itemNetMutatorBoolQuadDamagePowerup.at20;

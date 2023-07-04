@@ -72,9 +72,10 @@ extern int gNetPort;
 
 struct PKT_STARTGAME {
     short version;
-    char gameType, difficulty, monsterSettings, weaponSettings, itemSettings, respawnSettings, keySettings, randomizerMode;
+    char gameType, difficulty, monsterSettings, weaponSettings, itemSettings, respawnSettings, keySettings, itemWeaponSettings, randomizerMode;
     char episodeId, levelId;
     char userMap, userMapName[BMAX_PATH];
+    char monsterQuantity, monsterHealth, monsterSpeed;
     bool bQuadDamagePowerup;
     bool bDamageInvul;
     int nExplosionBehavior;

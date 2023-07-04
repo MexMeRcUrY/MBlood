@@ -763,6 +763,8 @@ static int osdcmd_quicksave(osdcmdptr_t UNUSED(parm))
     UNREFERENCED_CONST_PARAMETER(parm);
     if (!gGameStarted || gDemo.bPlaying || gDemo.bRecording || gGameMenuMgr.m_bActive)
         OSD_Printf("quicksave: not in a game.\n");
+    else if (gGameOptions.bPermaDeath)
+        OSD_Printf("quicksave: in permadeath mode.\n");
     else gDoQuickSave = 1;
     return OSDCMD_OK;
 }
@@ -1007,6 +1009,7 @@ int32_t registerosdcommands(void)
         { "cl_slopecrosshair", "enable/disable adjusting crosshair position for slope tilting", (void *)&gSlopeReticle, CVAR_BOOL, 0, 1 },
         { "cl_showplayernames", "enable/disable showing player names in multiplayer when looking at other players", (void *)&gShowPlayerNames, CVAR_BOOL, 0, 1 },
         { "cl_showweapon", "enable/disable show weapons (0: disable, 1: sprite, 2: voxel)", (void *)&gShowWeapon, CVAR_INT, 0, 2 },
+        { "cl_showloadsavebackdrop", "enable/disable the menu backdrop for loading/saving game", (void *)&gShowLoadingSavingBackground, CVAR_BOOL, 0, 1 },
         { "cl_slowroomflicker", "enable/disable slowed flickering speed for sectors (such as E1M4's snake pit room)", (void *)&gSlowRoomFlicker, CVAR_BOOL, 0, 1 },
         { "cl_shadowsfake3d", "enable/disable 3d projection for fake sprite shadows", (void *)&gShadowsFake3D, CVAR_BOOL, 0, 1 },
         { "cl_smoketrail3d", "enable/disable 3d smoke trail positioning for tnt/spray can (single-player only)", (void *)&gSmokeTrail3D, CVAR_BOOL, 0, 1 },
@@ -1103,6 +1106,7 @@ int32_t registerosdcommands(void)
         { "in_mouseflip", "invert vertical mouse movement", (void *)&gMouseAimingFlipped, CVAR_BOOL, 0, 1 },
         { "in_mousemode", "toggles vertical mouse view", (void *)&gMouseAim, CVAR_BOOL, 0, 1 },
         { "in_turnsensitivity", "keyboard turning sensitivity multiplier", (void *)&gTurnSpeed, CVAR_INT, 64, 124 },
+        { "in_turnacceleration", "set keyboard turning acceleration (0: off, 1: only when running, 2: always on)", (void *)&gTurnAcceleration, CVAR_INT, 0, 2 },
 
 //
         { "mus_enabled", "enables/disables music", (void *)&MusicToggle, CVAR_BOOL, 0, 1 },
@@ -1132,6 +1136,10 @@ int32_t registerosdcommands(void)
         { "skill", "changes the skill handicap for multiplayer (default: 2, range: 0-4)", (void *)&gSkill, CVAR_INT, 0, 4 },
 //
 //        { "snd_ambience", "enables/disables ambient sounds", (void *)&ud.config.AmbienceToggle, CVAR_BOOL, 0, 1 },
+        { "snd_ding", "enable/disable hit noise when damaging an enemy. the sound can be changed by replacing the 'notblood.pk3/HITSOUND.RAW' file", (void *)&gSoundDing, CVAR_BOOL, 0, 1 },
+        { "snd_dingvol", "set volume for hit sound (default: 75, range: 1-255)", (void *)&gSoundDingVol, CVAR_INT, 1, 255 },
+        { "snd_dingminfreq", "set min damage frequency for hit sound (default: 22050, range: 11025-44100)", (void *)&gSoundDingMinPitch, CVAR_INT, 11025, 44100 },
+        { "snd_dingmaxfreq", "set max damage frequency for hit sound (default: 22050, range: 11025-44100)", (void *)&gSoundDingMaxPitch, CVAR_INT, 11025, 44100 },
         { "snd_doppler", "enables/disables audio doppler effect (stereo only)", (void *)&DopplerToggle, CVAR_BOOL, 0, 1 },
         { "snd_enabled", "enables/disables sound effects", (void *)&SoundToggle, CVAR_BOOL, 0, 1 },
         { "snd_earangle", "set the listening ear offset (15-90 degrees)", (void *)&gSoundEarAng, CVAR_INT, 15, 90 },
@@ -1145,6 +1153,7 @@ int32_t registerosdcommands(void)
         { "snd_speed", "set the speed of sound m/s used for doppler calculation (default: 343, range: 10-1000)", (void *)&gSoundSpeed, CVAR_INT, 10, 1000 },
         { "snd_stereo", "enable/disable 3d stereo sound", (void *)&gStereo, CVAR_BOOL, 0, 1 },
         { "snd_fmpianofix", "enable/disable fm piano timbre fix", (void*)&gFMPianoFix, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
+        { "snd_occlusion", "enable/disable lowering sound volume by 50% for occluded sound sources", (void *)&gSoundOcclusion, CVAR_BOOL, 0, 1 },
         { "snd_underwaterpitch", "enable/disable lowering sound pitch by 7% while underwater", (void *)&gSoundUnderwaterPitch, CVAR_BOOL, 0, 1 },
 //        { "snd_speech", "enables/disables player speech", (void *)&ud.config.VoiceToggle, CVAR_INT, 0, 5 },
 //
@@ -1159,9 +1168,9 @@ int32_t registerosdcommands(void)
 //        { "touch_invert", "invert look up/down touch input", (void *) &droidinput.invertLook, CVAR_INT, 0, 1 },
 //#endif
 //
-        { "vid_gamma","adjusts gamma component of gamma ramp",(void *)&g_videoGamma, CVAR_FLOAT|CVAR_FUNCPTR, 0, 10 },
-        { "vid_contrast","adjusts contrast component of gamma ramp",(void *)&g_videoContrast, CVAR_FLOAT|CVAR_FUNCPTR, 0, 10 },
-        { "vid_brightness","adjusts brightness component of gamma ramp",(void *)&g_videoBrightness, CVAR_FLOAT|CVAR_FUNCPTR, 0, 10 },
+        { "vid_gamma","gamma/brightness correction",(void *) &g_videoGamma, CVAR_FLOAT|CVAR_FUNCPTR, (int)floor(MIN_GAMMA), (int)ceil(MAX_GAMMA) },
+        { "vid_contrast","contrast correction",(void *) &g_videoContrast, CVAR_FLOAT|CVAR_FUNCPTR, (int)floor(MIN_CONTRAST), (int)ceil(MAX_CONTRAST) },
+        { "vid_saturation","saturation correction",(void *) &g_videoSaturation, CVAR_FLOAT|CVAR_FUNCPTR, (int)floor(MIN_SATURATION), (int)ceil(MAX_SATURATION) },
 //        { "wchoice","sets weapon autoselection order", (void *)ud.wchoice, CVAR_STRING|CVAR_FUNCPTR, 0, MAX_WEAPONS },
     };
 //

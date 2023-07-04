@@ -77,7 +77,6 @@ extern char somethingintab;
 extern char names[MAXTILES][25];
 extern uint8_t buildkeys[NUMBUILDKEYS];
 
-extern float vid_gamma_3d, vid_contrast_3d, vid_brightness_3d;
 extern double msens;
 
 extern vec3_t startpos;
@@ -86,7 +85,7 @@ extern int16_t startang, startsectnum;
 extern int32_t lastpm16time, synctics;
 extern int32_t halfxdim16, midydim16, zoom;
 extern int32_t ydim16, bppgame, forcesetup;
-extern int32_t unrealedlook, quickmapcycling;
+extern int32_t unrealedlook, quickmapcycling, spriteinsertmode;
 extern int32_t pk_turnaccel,pk_turndecel,pk_uedaccel;
 extern int32_t revertCTRL,scrollamount;
 extern int32_t autosave;
@@ -99,6 +98,11 @@ extern int32_t graphicsmode;
 
 extern int32_t grid, autogrid;
 extern int32_t editorgridextent;	// in engine.c
+
+static FORCE_INLINE bool editorIsInitialized(void)
+{
+    return editorgridextent != -1;
+}
 
 extern char game_executable[BMAX_PATH];
 extern const char* DefaultGameExec;
@@ -120,9 +124,9 @@ extern int32_t showheightindicators;
 extern int32_t showambiencesounds;
 
 extern int32_t numgraysects;
-extern uint8_t graysectbitmap[(MAXSECTORS+7)>>3];
-extern uint8_t graywallbitmap[(MAXWALLS+7)>>3];
-extern int32_t autogray, showinnergray;
+extern uint8_t graysectbitmap[bitmap_size(MAXSECTORS)];
+extern uint8_t graywallbitmap[bitmap_size(MAXWALLS)];
+extern int32_t autogray, showinnergray, showgraysectors;
 
 extern void drawgradient(void);
 
@@ -164,6 +168,11 @@ enum
 typedef struct mapundo_
 {
     int32_t revision;
+
+    vec3_t  startpos;
+    int16_t startang;
+    int16_t startsectnum;
+
     int32_t num[3];  // numsectors, numwalls, numsprites
 
     // These exist temporarily as sector/wall/sprite data, but are always compressed
@@ -171,7 +180,7 @@ typedef struct mapundo_
     char *lz4Blocks[3];  // sector, wall, sprite
     int   lz4Size[3];
 
-    uintptr_t crc[3];
+    XXH64_hash_t crc[3];
 
     struct mapundo_ *next;  // 'redo' loads this
     struct mapundo_ *prev;  // 'undo' loads this
@@ -374,7 +383,7 @@ void inflineintersect(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
 void ovhscrcoords(int32_t x, int32_t y, int32_t *scrx, int32_t *scry);
 
-extern uint8_t hlsectorbitmap[(MAXSECTORS+7)>>3];
+extern uint8_t hlsectorbitmap[bitmap_size(MAXSECTORS)];
 
 void test_map(int32_t mode);
 

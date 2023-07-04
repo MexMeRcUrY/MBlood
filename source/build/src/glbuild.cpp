@@ -62,14 +62,16 @@ void buildgl_outputDebugMessage(uint8_t severity, const char* format, ...)
 void buildgl_resetStateAccounting()
 {
     for (auto i=GL_TEXTURE0;i<MAXTEXUNIT;i++)
+    {
+        buildgl_bindSamplerObject(TEXUNIT_INDEX_FROM_NAME(i), 0);
         inthash_free(&gl.state[TEXUNIT_INDEX_FROM_NAME(i)]);
+    }
 
     Bmemset(&gl, 0, sizeof(BuildGLState));
 
     for (auto i=GL_TEXTURE0;i<MAXTEXUNIT;i++)
     {
-        buildgl_bindSamplerObject(TEXUNIT_INDEX_FROM_NAME(i), 0);
-        gl.currentBoundSampler[TEXUNIT_INDEX_FROM_NAME(i)] = (glsamplertype)-1;
+        gl.currentBoundSampler[TEXUNIT_INDEX_FROM_NAME(i)] = SAMPLER_INVALID;
         gl.state[TEXUNIT_INDEX_FROM_NAME(i)].count = 64;
         inthash_init(&gl.state[TEXUNIT_INDEX_FROM_NAME(i)]);
     }
@@ -182,6 +184,9 @@ void buildgl_resetSamplerObjects(void)
     glanisotropy    = clamp<int>(glanisotropy, 1, glinfo.maxanisotropy);
     gltexfiltermode = clamp(gltexfiltermode, 0, NUMGLFILTERMODES-1);
 
+    if (!glinfo.samplerobjects)
+        return;
+
     auto &f = glfiltermodes[gltexfiltermode];
 
     if (!glIsSampler(samplerObjectIDs[1]))
@@ -253,7 +258,10 @@ void buildgl_bindSamplerObject(int texunit, int32_t pth_method)
     if (!buildgl_samplerObjectsEnabled())
     {
         gl.currentBoundSampler[texunit] = SAMPLER_NONE;
-        glBindSampler(texunit, 0);
+
+        if (glinfo.samplerobjects)
+            glBindSampler(texunit, 0);
+        
         return;
     }
 
@@ -607,8 +615,11 @@ void texdbg_bglGenTextures(GLsizei n, GLuint *textures, const char *srcfn)
     uint32_t hash = srcfn ? texdbg_getcode(srcfn) : 0;
 
     for (i=0; i<n; i++)
-        if (textures[i] < texnameallocsize && (texnameused[textures[i]>>3]&pow2char[textures[i]&7]))
-            initprintf("texdebug %x Gen: overwriting used tex name %u from %x\n", hash, textures[i], texnamefromwhere[textures[i]]);
+    {
+        GLuint const t = textures[i];
+        if (t < texnameallocsize && bitmap_test(texnameused, t))
+            initprintf("texdebug %x Gen: overwriting used tex name %u from %x\n", hash, t, texnamefromwhere[t]);
+    }
 
     bglGenTextures(n, textures);
 
@@ -622,8 +633,9 @@ void texdbg_bglGenTextures(GLsizei n, GLuint *textures, const char *srcfn)
 
         for (i=0; i<n; i++)
         {
-            texnameused[textures[i]>>3] |= pow2char[textures[i]&7];
-            texnamefromwhere[textures[i]] = hash;
+            GLuint const t = textures[i];
+            bitmap_set(texnameused, t);
+            texnamefromwhere[t] = hash;
         }
     }
 }
@@ -635,23 +647,26 @@ void texdbg_bglDeleteTextures(GLsizei n, const GLuint *textures, const char *src
     uint32_t hash = srcfn ? texdbg_getcode(srcfn) : 0;
 
     for (i=0; i<n; i++)
-        if (textures[i] < texnameallocsize)
+    {
+        GLuint const t = textures[i];
+        if (t < texnameallocsize)
         {
-            if ((texnameused[textures[i]>>3]&pow2char[textures[i]&7])==0)
-                initprintf("texdebug %x Del: deleting unused tex name %u\n", hash, textures[i]);
-            else if ((texnameused[textures[i]>>3]&pow2char[textures[i]&7]) &&
-                         texnamefromwhere[textures[i]] != hash)
+            if (!bitmap_test(texnameused, t))
+                initprintf("texdebug %x Del: deleting unused tex name %u\n", hash, t);
+            else if (bitmap_test(texnameused, t) && texnamefromwhere[t] != hash)
                 initprintf("texdebug %x Del: deleting foreign tex name %u from %x\n", hash,
-                           textures[i], texnamefromwhere[textures[i]]);
+                           t, texnamefromwhere[t]);
         }
+    }
 
     bglDeleteTextures(n, textures);
 
     if (texnameallocsize)
         for (i=0; i<n; i++)
         {
-            texnameused[textures[i]>>3] &= ~pow2char[textures[i]&7];
-            texnamefromwhere[textures[i]] = 0;
+            GLuint const t = textures[i];
+            bitmap_clear(texnameused, t);
+            texnamefromwhere[t] = 0;
         }
 }
 # endif  // defined DEBUGGINGAIDS

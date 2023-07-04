@@ -595,7 +595,7 @@ int gDoQuickSave = 0;
 
 void StartLevel(GAMEOPTIONS *gameOptions)
 {
-    const bool bTriggerAutosave = gAutosave && !gDemo.bRecording && !gDemo.bPlaying && (gGameOptions.nGameType == kGameTypeSinglePlayer) && gameOptions->uGameFlags&kGameFlagContinuing; // if demo isn't active and not in multiplayer session and we switched to new level
+    const char bTriggerAutosave = gAutosave && !gDemo.bRecording && !gDemo.bPlaying && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (gameOptions->uGameFlags&kGameFlagContinuing); // if demo isn't active and not in multiplayer session and we switched to new level
     EndLevel();
     gInput = {};
     gStartNewGame = 0;
@@ -655,11 +655,15 @@ void StartLevel(GAMEOPTIONS *gameOptions)
             gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
         else
             gGameOptions.nMonsterRespawnTime = (gPacketStartGame.monsterSettings - 2) * 30 * kTicRate;
+        gGameOptions.nEnemyQuantity = gPacketStartGame.monsterQuantity;
+        gGameOptions.nEnemyHealth = gPacketStartGame.monsterHealth;
+        gGameOptions.nEnemySpeed = gPacketStartGame.monsterSpeed;
         gGameOptions.nWeaponSettings = gPacketStartGame.weaponSettings;
         gGameOptions.nItemSettings = gPacketStartGame.itemSettings;
         gGameOptions.nRespawnSettings = gPacketStartGame.respawnSettings;
         gGameOptions.bFriendlyFire = gPacketStartGame.bFriendlyFire;
         gGameOptions.nKeySettings = gPacketStartGame.keySettings;
+        gGameOptions.bItemWeaponSettings = gPacketStartGame.itemWeaponSettings;
         gGameOptions.bAutoTeams = gPacketStartGame.bAutoTeams;
         gGameOptions.nSpawnProtection = gPacketStartGame.nSpawnProtection;
         gGameOptions.nSpawnWeapon = gPacketStartGame.nSpawnWeapon;
@@ -682,11 +686,9 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nRandomizerMode = gPacketStartGame.randomizerMode;
         Bstrncpyz(gGameOptions.szRandomizerSeed, gPacketStartGame.szRandomizerSeed, sizeof(gGameOptions.szRandomizerSeed));
         gGameOptions.nRandomizerCheat = -1;
-        gGameOptions.nEnemyQuantity = gGameOptions.nDifficulty;
-        gGameOptions.nEnemyHealth = gGameOptions.nDifficulty;
-        gGameOptions.nEnemySpeed = 0;
         gGameOptions.bEnemyShuffle = false;
         gGameOptions.bPitchforkOnly = false;
+        gGameOptions.bPermaDeath = false;
         gGameOptions.uSpriteBannedFlags = gPacketStartGame.uSpriteBannedFlags;
         //Cutscene / cinematic
         if (gEpisodeInfo[gGameOptions.nEpisode].cutALevel == gGameOptions.nLevel
@@ -881,7 +883,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
     gGameStarted = 1;
     ready2send = 1;
     gAutosaveInCurLevel = false;
-    if (bTriggerAutosave)
+    if (bTriggerAutosave && !gGameOptions.bPermaDeath)
         AutosaveGame(true); // create autosave at start of the new level
 }
 
@@ -902,11 +904,15 @@ void StartNetworkLevel(void)
             gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
         else
             gGameOptions.nMonsterRespawnTime = (gPacketStartGame.monsterSettings - 2) * 30 * kTicRate;
+        gGameOptions.nEnemyQuantity = gPacketStartGame.monsterQuantity;
+        gGameOptions.nEnemyHealth = gPacketStartGame.monsterHealth;
+        gGameOptions.nEnemySpeed = gPacketStartGame.monsterSpeed;
         gGameOptions.nWeaponSettings = gPacketStartGame.weaponSettings;
         gGameOptions.nItemSettings = gPacketStartGame.itemSettings;
         gGameOptions.nRespawnSettings = gPacketStartGame.respawnSettings;
         gGameOptions.bFriendlyFire = gPacketStartGame.bFriendlyFire;
         gGameOptions.nKeySettings = gPacketStartGame.keySettings;
+        gGameOptions.bItemWeaponSettings = gPacketStartGame.itemWeaponSettings;
         gGameOptions.bAutoTeams = gPacketStartGame.bAutoTeams;
         gGameOptions.nSpawnProtection = gPacketStartGame.nSpawnProtection;
         gGameOptions.nSpawnWeapon = gPacketStartGame.nSpawnWeapon;
@@ -929,11 +935,9 @@ void StartNetworkLevel(void)
         gGameOptions.nRandomizerMode = gPacketStartGame.randomizerMode;
         Bstrncpyz(gGameOptions.szRandomizerSeed, gPacketStartGame.szRandomizerSeed, sizeof(gGameOptions.szRandomizerSeed));
         gGameOptions.nRandomizerCheat = -1;
-        gGameOptions.nEnemyQuantity = gGameOptions.nDifficulty;
-        gGameOptions.nEnemyHealth = gGameOptions.nDifficulty;
-        gGameOptions.nEnemySpeed = 0;
         gGameOptions.bEnemyShuffle = false;
         gGameOptions.bPitchforkOnly = false;
+        gGameOptions.bPermaDeath = false;
         gGameOptions.uSpriteBannedFlags = gPacketStartGame.uSpriteBannedFlags;
         ///////
     }
@@ -963,19 +967,21 @@ static void DoQuickSave(void)
 {
     if (gGameStarted && !gGameMenuMgr.m_bActive && gPlayer[myconnectindex].pXSprite->health != 0)
     {
-        if (gLockManualSaving) // if manual saving is locked
+        if (gLockManualSaving || gGameOptions.bPermaDeath) // if manual saving is locked
         {
             viewSetMessage("Quicksaving is locked!");
-            viewSetMessage("Change lock save settings to save...");
+            viewSetMessage(gGameOptions.bPermaDeath ? "Game is in permadeath mode..." : "Change lock save settings to save...");
             return;
         }
         QuickSaveGame();
     }
 }
 
-int DoRestoreSave(void)
+static int DoRestoreSave(void)
 {
     if (gGameOptions.nGameType != kGameTypeSinglePlayer || numplayers > 1) // in multiplayer game, do not save
+        return 0;
+    if (gGameOptions.bPermaDeath)
         return 0;
     if (LoadSavedInCurrentSession(gQuickLoadSlot)) // if quickload is set to save from current session, load save
     {
@@ -1034,7 +1040,7 @@ void LocalKeys(void)
     if (gDoQuickSave)
     {
         keyFlushScans();
-        if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gDemo.bPlaying && !gDemo.bRecording) // if not in multiplayer session and not in demo playback, allow quicksave
+        if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gGameOptions.bPermaDeath && !gDemo.bPlaying && !gDemo.bRecording) // if not in multiplayer session and not in demo playback, allow quicksave
         {
             switch (gDoQuickSave)
             {
@@ -1109,12 +1115,12 @@ void LocalKeys(void)
             break;
         case sc_F2:
             keyFlushScans();
-            if (!gGameMenuMgr.m_bActive && gGameOptions.nGameType == kGameTypeSinglePlayer && !gLockManualSaving)
+            if (!gGameMenuMgr.m_bActive && (gGameOptions.nGameType == kGameTypeSinglePlayer) && !gLockManualSaving && !gGameOptions.bPermaDeath)
                 gGameMenuMgr.Push(&menuSaveGame,-1);
-            else if (gLockManualSaving && gGameOptions.nGameType == kGameTypeSinglePlayer) // if manual saving is locked and not currently in multiplayer
+            else if ((gLockManualSaving || gGameOptions.bPermaDeath) && (gGameOptions.nGameType == kGameTypeSinglePlayer)) // if manual saving is locked and not currently in multiplayer
             {
                 viewSetMessage("Saving is locked!");
-                viewSetMessage("Change lock save settings to save...");
+                viewSetMessage(gGameOptions.bPermaDeath ? "Game is in permadeath mode..." : "Change lock save settings to save...");
             }
             break;
         case sc_F3:
@@ -1144,7 +1150,7 @@ void LocalKeys(void)
             return;
         case sc_F9:
             keyFlushScans();
-            if (gGameOptions.nGameType == kGameTypeSinglePlayer)
+            if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gGameOptions.bPermaDeath)
                 DoQuickLoad();
             break;
         case sc_F10:
@@ -1196,8 +1202,8 @@ void ProcessFrame(void)
             gFifoInput[gNetFifoTail&255][i].strafe <<= 8;
             gFifoInput[gNetFifoTail&255][i].forward >>= 8;
             gFifoInput[gNetFifoTail&255][i].forward <<= 8;
-            const int mturn = fix16_to_int(gFifoInput[gNetFifoTail&255][i].q16turn<<2);
-            gFifoInput[gNetFifoTail&255][i].q16turn = fix16_from_int(mturn>>2);
+            const int mturn = fix16_to_int(gFifoInput[gNetFifoTail&255][i].q16turn)<<2;
+            gFifoInput[gNetFifoTail&255][i].q16turn = fix16_from_int(mturn)>>2;
             const int mlook = ClipRange(fix16_to_int(gFifoInput[gNetFifoTail&255][i].q16mlook*4), -256, 255);
             gFifoInput[gNetFifoTail&255][i].q16mlook = fix16_from_int(mlook/4);
         }
@@ -1237,6 +1243,12 @@ void ProcessFrame(void)
         if (gPlayer[i].input.keyFlags.restart) // if restart requested from ProcessInput()
         {
             gPlayer[i].input.keyFlags.restart = 0;
+            if (gGameOptions.bPermaDeath && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // quit to main menu
+            {
+                gQuitGame = true;
+                gRestartGame = true;
+                return;
+            }
             if (gPlayer[i].input.keyFlags.action && gGameOptions.nGameType == kGameTypeSinglePlayer && numplayers == 1) // if pressed action key and not in multiplayer session
             {
                 if (DoRestoreSave()) // attempt to load last save, if fail then restart current level
@@ -1808,8 +1820,6 @@ int app_main(int argc, char const * const * argv)
     }
 #endif
 
-    win_priorityclass = 0;
-
     G_ExtPreInit(argc, argv);
 
 #ifdef DEBUGGINGAIDS
@@ -2078,6 +2088,7 @@ int app_main(int argc, char const * const * argv)
         scrCustomizePalette(gCustomPalette % ARRAY_SSIZE(srcCustomPaletteStr), gCustomPaletteCIEDE2000, gCustomPaletteGrayscale, gCustomPaletteInvert);
     scrSetGamma(gGamma);
     viewResizeView(gViewSize);
+    vsync = videoSetVsync(vsync);
     initprintf("Initializing sound system\n");
     sndInit();
     sfxInit();

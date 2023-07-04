@@ -2728,7 +2728,7 @@ int actFloorBounceVector(int *x, int *y, int *z, int nSector, int a5)
 
 void actRadiusDamage(int nSprite, int x, int y, int z, int nSector, int nDist, int baseDmg, int distDmg, DAMAGE_TYPE dmgType, int flags, int burn)
 {
-    char sectmap[(kMaxSectors+7)>>3];
+    char sectmap[bitmap_size(kMaxSectors)];
     int nOwner = actSpriteIdToOwnerId(nSprite);
     gAffectedSectors[0] = 0;
     gAffectedXWalls[0] = 0;
@@ -3483,6 +3483,9 @@ int actDamageSprite(int nSource, spritetype *pSprite, DAMAGE_TYPE damageType, in
                 nDamageFactor = getDudeInfo(pSprite->type)->curDamage[damageType];
             #endif
 
+            const int kDamageBeforeScaling = damage;
+            const char bWasAlive = (pXSprite->health > 0);
+
             if (!nDamageFactor) return 0;
             else if (nDamageFactor != 256)
                 damage = mulscale8(damage, nDamageFactor);
@@ -3500,6 +3503,21 @@ int actDamageSprite(int nSource, spritetype *pSprite, DAMAGE_TYPE damageType, in
                 if (pXSprite->health > 0 || playerSeqPlaying(pPlayer, 16))
                     damage = playerDamageSprite(nSource, pPlayer, damageType, damage);
 
+            }
+
+            if (gSoundDing && (pSourcePlayer == gMe) && (pSprite != gMe->pSprite) && (damage > 0) && bWasAlive) {
+                for (int i = 0; i < 4; i++) {
+                    DMGFEEDBACK *pSoundDmgSprite = &gSoundDingSprite[i];
+                    if (pSoundDmgSprite->nSprite == -1) {
+                        pSoundDmgSprite->nSprite = pSprite->index;
+                        pSoundDmgSprite->nDamage = kDamageBeforeScaling;
+                        break;
+                    }
+                    if (pSoundDmgSprite->nSprite == pSprite->index) {
+                        pSoundDmgSprite->nDamage += kDamageBeforeScaling;
+                        break;
+                    }
+                }
             }
         }
         break;
@@ -4486,7 +4504,16 @@ int MoveThing(spritetype *pSprite)
             }
         }
     }
-    if (CheckLink(pSprite))
+    char bIgnoreROR = 0;
+    if ((pSprite->type == kThingDripWater || pSprite->type == kThingDripBlood) && gGameOptions.bSectorBehavior && !VanillaMode()) // check if droplet is moving through ror sector
+    {
+        const vec3_t kBakPos = pSprite->xyz;
+        const int kBakSect = nSector;
+        bIgnoreROR = CheckLink(&pSprite->x, &pSprite->y, &pSprite->z, &nSector) && IsUnderwaterSector(nSector); // only allow ror traversal if ror sector is not underwater (fixes bug where droplets move through water)
+        pSprite->xyz = kBakPos;
+        nSector = kBakSect;
+    }
+    if (bIgnoreROR || CheckLink(pSprite))
         GetZRange(pSprite, &ceilZ, &ceilHit, &floorZ, &floorHit, pSprite->clipdist<<2, CLIPMASK0);
     GetSpriteExtents(pSprite, &top, &bottom);
     if (bottom >= floorZ)
@@ -6277,7 +6304,7 @@ void actProcessSprites(void)
     }
     for (nSprite = headspritestat[kStatExplosion]; nSprite >= 0; nSprite = nextspritestat[nSprite])
     {
-        char sectmap[(kMaxSectors+7)>>3];
+        char sectmap[bitmap_size(kMaxSectors)];
         spritetype *pSprite = &sprite[nSprite];
 
         if (pSprite->flags & 32)
