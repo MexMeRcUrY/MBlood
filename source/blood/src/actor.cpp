@@ -3025,7 +3025,7 @@ void actKillDude(int nKillerSprite, spritetype *pSprite, DAMAGE_TYPE damageType,
         }
         break;
     case kDudeTinyCaleb:
-        if (!EnemiesNotBlood() || VanillaMode())
+        if (!EnemiesNBlood() || VanillaMode())
             break;
         if (damageType == kDamageBurn && pXSprite->medium == kMediumNormal)
         {
@@ -4268,7 +4268,13 @@ void ProcessTouchObjects(spritetype *pSprite, int nXSprite)
             #else
                 if (pPlayer)
             #endif
-                actDamageSprite(nSprite, pSprite2,kDamageBullet, 8);
+                {
+                    const char bPlayerWasAlive = gStompSound && ((pXSprite2->health > 0) || (IsPlayerSprite(pSprite2) && playerSeqPlaying(&gPlayer[pSprite2->type-kDudePlayer1], 16)));
+                    const char bKillingPlayer = gStompSound && (IsPlayerSprite(pSprite2) && ((pPlayer == gMe) || (pSprite2 == gMe->pSprite)));
+                    actDamageSprite(nSprite, pSprite2,kDamageBullet, 8);
+                    if (gStompSound && bKillingPlayer && bPlayerWasAlive && (pXSprite2->health == 0))
+                        sndStartSample("NOTSTOMP", FXVolume, -1, 22050);
+                }
                 break;
             }
         }
@@ -4945,7 +4951,7 @@ void MoveDude(spritetype *pSprite)
                     break;
                 case kDudeBurningCultist:
                 {
-                    const bool fixRandomCultist = EnemiesNotBlood() && (pSprite->inittype >= kDudeBase) && (pSprite->inittype < kDudeMax) && (pSprite->inittype != pSprite->type) && !VanillaMode(); // fix burning cultists randomly switching types underwater
+                    const bool fixRandomCultist = EnemiesNBlood() && (pSprite->inittype >= kDudeBase) && (pSprite->inittype < kDudeMax) && (pSprite->inittype != pSprite->type) && !VanillaMode(); // fix burning cultists randomly switching types underwater
                     if (fixRandomCultist)
                         pSprite->type = pSprite->inittype;
                     else if (Chance(chance)) // vanilla behavior
@@ -5272,6 +5278,7 @@ int MoveMissile(spritetype *pSprite)
     GetSpriteExtents(pSprite, &top, &bottom);
     int i = 1;
     const char bIsFlameSprite = (pSprite->type == kMissileFlameSpray) || (pSprite->type == kMissileFlameHound); // do not use eduke clipmove for flame based sprites (changes damage too much)
+    const char bButcherKnife = (pSprite->type == kMissileButcherKnife) && spriRangeIsFine(pSprite->owner) && (sprite[pSprite->owner].type == kDudeZombieButcher);
     while (1)
     {
         int x = pSprite->x;
@@ -5374,15 +5381,19 @@ int MoveMissile(spritetype *pSprite)
         bottom += vz;
         if (bottom >= floorZ)
         {
-            gSpriteHit[nXSprite].florhit = floorHit;
+            if (bButcherKnife && ((floorHit&0xC000) == 0xC000) && IsPlayerSprite(&sprite[floorHit&0x3fff]) && EnemiesNotBlood() && !VanillaMode()) // tweak butcher knife so it will hit players
+                gHitInfo.hitsprite = floorHit&0x3fff, vdi = 3;
+            else
+                gSpriteHit[nXSprite].florhit = floorHit, vdi = 2;
             vz += floorZ-bottom;
-            vdi = 2;
         }
         if (top <= ceilZ)
         {
-            gSpriteHit[nXSprite].ceilhit = ceilHit;
+            if (bButcherKnife && ((ceilHit&0xC000) == 0xC000) && IsPlayerSprite(&sprite[ceilHit&0x3fff]) && EnemiesNotBlood() && !VanillaMode()) // tweak butcher knife so it will hit players
+                gHitInfo.hitsprite = ceilHit&0x3fff, vdi = 3;
+            else
+                gSpriteHit[nXSprite].ceilhit = ceilHit, vdi = 1;
             vz += ClipLow(ceilZ-top, 0);
-            vdi = 1;
         }
         pSprite->x = x;
         pSprite->y = y;
@@ -6544,7 +6555,7 @@ void actProcessSprites(void)
             #else
             const bool burningType = (pSprite->type == kDudeBurningInnocent) || (pSprite->type == kDudeBurningCultist) || (pSprite->type == kDudeBurningZombieAxe) || (pSprite->type == kDudeBurningZombieButcher) || (pSprite->type == kDudeBurningTinyCaleb) || (pSprite->type == kDudeBurningBeast);
             #endif
-            const bool fixBurnGlitch = EnemiesNotBlood() && burningType && !VanillaMode(); // if enemies are burning, always apply burning damage per tick
+            const bool fixBurnGlitch = EnemiesNBlood() && burningType && !VanillaMode(); // if enemies are burning, always apply burning damage per tick
             if ((pXSprite->burnTime > 0) || fixBurnGlitch)
             {
                 switch (pSprite->type)
@@ -6603,7 +6614,7 @@ void actProcessSprites(void)
                         pPlayer->underwaterTime = 1200;
                     else
                         pPlayer->underwaterTime = ClipLow(pPlayer->underwaterTime-4, 0);
-                    if (pPlayer->underwaterTime < 1080 && packCheckItem(pPlayer, kPackDivingSuit) && !bDivingSuit && ((pPlayer->pXSprite->health > 0) || VanillaMode())) // don't activate diving suit if player is dead
+                    if (pPlayer->underwaterTime < 1080 && packCheckItem(pPlayer, kPackDivingSuit) && !bDivingSuit && (((pPlayer->pXSprite->health > 0) && gAutoDivingSuit) || VanillaMode())) // don't activate diving suit if player is dead
                         packUseItem(pPlayer, kPackDivingSuit);
                     if (!pPlayer->underwaterTime)
                     {
@@ -6771,7 +6782,7 @@ spritetype *actSpawnDude(spritetype *pSource, short nType, int a3, int a4)
         y = pSource->y+mulscale30r(Sin(angle), a3);
     }
     pSprite2->type = nType;
-    if (EnemiesNotBlood() && !VanillaMode())
+    if (EnemiesNBlood() && !VanillaMode())
         pSprite2->inittype = nType;
     pSprite2->ang = angle;
     vec3_t pos = { x, y, z };

@@ -632,7 +632,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nExplosionBehavior = gExplosionBehavior;
         gGameOptions.nProjectileBehavior = gProjectileBehavior;
         gGameOptions.bNapalmFalloff = gNapalmFalloff;
-        gGameOptions.bEnemyBehavior = gEnemyBehavior;
+        gGameOptions.nEnemyBehavior = gEnemyBehavior;
         gGameOptions.bEnemyRandomTNT = gEnemyRandomTNT;
         gGameOptions.nWeaponsVer = gWeaponsVer;
         gGameOptions.bSectorBehavior = gSectorBehavior;
@@ -647,6 +647,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nEpisode = gPacketStartGame.episodeId;
         gGameOptions.nLevel = gPacketStartGame.levelId;
         gGameOptions.nGameType = gPacketStartGame.gameType;
+        gGameOptions.uNetGameFlags = gPacketStartGame.uNetGameFlags;
         gGameOptions.nDifficulty = gPacketStartGame.difficulty;
         gGameOptions.nMonsterSettings = ClipRange(gPacketStartGame.monsterSettings, 0, 2);
         if (gPacketStartGame.monsterSettings <= 1)
@@ -678,7 +679,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nExplosionBehavior = gPacketStartGame.nExplosionBehavior;
         gGameOptions.nProjectileBehavior = gPacketStartGame.nProjectileBehavior;
         gGameOptions.bNapalmFalloff = gPacketStartGame.bNapalmFalloff;
-        gGameOptions.bEnemyBehavior = gPacketStartGame.bEnemyBehavior;
+        gGameOptions.nEnemyBehavior = gPacketStartGame.nEnemyBehavior;
         gGameOptions.bEnemyRandomTNT = gPacketStartGame.bEnemyRandomTNT;
         gGameOptions.nWeaponsVer = gPacketStartGame.nWeaponsVer;
         gGameOptions.bSectorBehavior = gPacketStartGame.bSectorBehavior;
@@ -830,6 +831,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gProfileNet[i] = gProfile[i];
         playerStart(i, 1);
     }
+    playerInitRoundCheck();
     if (gameOptions->uGameFlags&kGameFlagContinuing) // if episode is in progress, restore player stats
     {
         for (int i = connecthead; i >= 0; i = connectpoint2[i])
@@ -896,6 +898,7 @@ void StartNetworkLevel(void)
         gGameOptions.nEpisode = gPacketStartGame.episodeId;
         gGameOptions.nLevel = gPacketStartGame.levelId;
         gGameOptions.nGameType = gPacketStartGame.gameType;
+        gGameOptions.uNetGameFlags = gPacketStartGame.uNetGameFlags;
         gGameOptions.nDifficulty = gPacketStartGame.difficulty;
         gGameOptions.nMonsterSettings = ClipRange(gPacketStartGame.monsterSettings, 0, 2);
         if (gPacketStartGame.monsterSettings <= 1)
@@ -927,7 +930,7 @@ void StartNetworkLevel(void)
         gGameOptions.nExplosionBehavior = gPacketStartGame.nExplosionBehavior;
         gGameOptions.nProjectileBehavior = gPacketStartGame.nProjectileBehavior;
         gGameOptions.bNapalmFalloff = gPacketStartGame.bNapalmFalloff;
-        gGameOptions.bEnemyBehavior = gPacketStartGame.bEnemyBehavior;
+        gGameOptions.nEnemyBehavior = gPacketStartGame.nEnemyBehavior;
         gGameOptions.bEnemyRandomTNT = gPacketStartGame.bEnemyRandomTNT;
         gGameOptions.nWeaponsVer = gPacketStartGame.nWeaponsVer;
         gGameOptions.bSectorBehavior = gPacketStartGame.bSectorBehavior;
@@ -1208,6 +1211,7 @@ void ProcessFrame(void)
             gFifoInput[gNetFifoTail&255][i].q16mlook = fix16_from_int(mlook/4);
         }
         gPlayer[i].input.buttonFlags = gFifoInput[gNetFifoTail&255][i].buttonFlags;
+        gPlayer[i].input.syncFlags.run = gFifoInput[gNetFifoTail&255][i].syncFlags.run;
         gPlayer[i].input.keyFlags.word |= gFifoInput[gNetFifoTail&255][i].keyFlags.word;
         gPlayer[i].input.useFlags.byte |= gFifoInput[gNetFifoTail&255][i].useFlags.byte;
         if (gFifoInput[gNetFifoTail&255][i].newWeapon)
@@ -1276,6 +1280,13 @@ void ProcessFrame(void)
             return;
         if (gDemo.bRecording)
             gDemo.Write(gFifoInput[(gNetFifoTail-1)&255]);
+        else if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // always use current global settings for player while in single-player
+        {
+            gProfile[myconnectindex].nWeaponHBobbing = gWeaponHBobbing;
+            gProfile[myconnectindex].nAutoAim = gAutoAim;
+            gProfile[myconnectindex].nWeaponSwitch = gWeaponSwitch;
+            gProfile[myconnectindex].bWeaponFastSwitch = gWeaponFastSwitch;
+        }
     }
     for (int i = connecthead; i >= 0; i = connectpoint2[i])
     {
@@ -2276,6 +2287,10 @@ RESTART:
                             bQuickNetStart = false;
                         }
                     }
+                    if (gGameMenuMgr.pActiveMenu == &menuNetworkBrowser) // search for servers
+                        netIRCProcess();
+                    else // exited server browser, gracefully disconnect from master list
+                        netIRCDeinitialize();
                 }
                 break;
             case INPUT_MODE_2:
@@ -3140,8 +3155,12 @@ bool ProjectilesRaze(void) {
     return gGameOptions.nProjectileBehavior == 2; // raze's projectile collision
 }
 
+bool EnemiesNBlood(void) {
+    return gGameOptions.nEnemyBehavior >= 1; // nblood's enemies
+}
+
 bool EnemiesNotBlood(void) {
-    return gGameOptions.bEnemyBehavior == 1; // notblood's enemies
+    return gGameOptions.nEnemyBehavior == 2; // notblood's enemies
 }
 
 bool fileExistsRFF(int id, const char *ext) {

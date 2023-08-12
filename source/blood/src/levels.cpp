@@ -58,8 +58,8 @@ GAMEOPTIONS gSingleGameOptions = {
     0,     // int picEntry;
     0,     // unsigned int uMapCRC;
     1,     // char nMonsterSettings;
-    0,     // int uGameFlags;
-    0,     // int uNetGameFlags;
+    kGameFlagNone, // int uGameFlags;
+    kNetGameFlagNone, // int uNetGameFlags;
     0,     // char nWeaponSettings;
     0,     // char nItemSettings;
     0,     // char nRespawnSettings;
@@ -73,7 +73,7 @@ GAMEOPTIONS gSingleGameOptions = {
     0,     // int nExplosionBehavior;
     0,     // int nProjectileBehavior;
     0,     // bool bNapalmFalloff;
-    0,     // bool bEnemyBehavior;
+    0,     // int nEnemyBehavior;
     0,     // bool bEnemyRandomTNT;
     1,     // int nWeaponsVer;
     0,     // bool bSectorBehavior;

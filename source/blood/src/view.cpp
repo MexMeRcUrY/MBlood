@@ -368,8 +368,7 @@ void fakeProcessInput(PLAYER *pPlayer, GINPUT *pInput)
         gViewLookAdjust = 0.f;
     }
 
-    predict.at70 = pInput->syncFlags.run;
-    predict.at70 = 0;
+    predict.at70 = (gProfile[pPlayer->nPlayer].nWeaponHBobbing == 2) || VanillaMode() ? pInput->syncFlags.run : 0; // v1.0x weapon swaying (vanilla 1.21 multiplayer hardcoded this)
     predict.at71 = pInput->buttonFlags.jump;
     if (predict.at48 == 1)
     {
@@ -617,12 +616,9 @@ void fakePlayerProcess(PLAYER *pPlayer, GINPUT *pInput)
     {
         if (pXSprite->height < 256)
         {
-            int isRunning = predict.at70;
-            if ((gProfile[pPlayer->nPlayer].nWeaponHBobbing == 2) || (VanillaMode() && numplayers > 1)) // v1.0x weapon swaying (vanilla 1.21 multiplayer hardcoded this)
-                isRunning = 1; // always running
-            predict.at4 = (predict.at4+(pPosture->pace[isRunning]*4))&2047;
-            predict.at14 = (predict.at14+(pPosture->pace[isRunning]*4)/2)&2047;
-            const int clampPhase = isRunning ? 60 : 30;
+            predict.at4 = (predict.at4+(pPosture->pace[predict.at70]*4))&2047;
+            predict.at14 = (predict.at14+(pPosture->pace[predict.at70]*4)/2)&2047;
+            const int clampPhase = predict.at70 ? 60 : 30;
             if (predict.at0 < clampPhase)
                 predict.at0 = ClipHigh(predict.at0 + nSpeed, clampPhase);
         }
@@ -945,7 +941,8 @@ void viewCorrectPrediction(void)
     }
     spritetype *pSprite = gMe->pSprite;
     VIEW *pView = &predictFifo[(gNetFifoTail-1)&255];
-    if (gMe->q16ang != pView->at30 || pView->at24 != gMe->q16horiz || pView->at50 != pSprite->x || pView->at54 != pSprite->y || pView->at58 != pSprite->z)
+    const char bCalPrediction = !VanillaMode() || (gMe->q16ang != pView->at30 || pView->at24 != gMe->q16horiz || pView->at50 != pSprite->x || pView->at54 != pSprite->y || pView->at58 != pSprite->z);
+    if (bCalPrediction)
     {
         viewInitializePrediction();
         predictOld = gPrevView[myconnectindex];
@@ -1341,12 +1338,12 @@ void viewDrawStats(PLAYER *pPlayer, int x, int y)
     colorStr.nColor2[0] = colorStr.nColor2[1] = -1; // unused
     colorStrKills = colorStrSecrets = colorStr;
 
-    int nHeight;
+    int nHeight, nLevelTime = (gGameOptions.nGameType >= kGameTypeBloodBath) && (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) ? ClipLow(gPlayerRoundLimit-gLevelTime, 0) : gLevelTime;
     viewGetFontInfo(nFont, NULL, NULL, &nHeight);
     sprintf(buffer, "T:%d:%02d.%02d",
-        (gLevelTime/(kTicsPerSec*60)),
-        (gLevelTime/kTicsPerSec)%60,
-        ((gLevelTime%kTicsPerSec)*33)/10
+        (nLevelTime/(kTicsPerSec*60)),
+        (nLevelTime/kTicsPerSec)%60,
+        ((nLevelTime%kTicsPerSec)*33)/10
         );
     viewDrawText(3, buffer, x, y, 20, 0, 0, true, 256, 0, &colorStr);
     if ((gGameOptions.nMonsterSettings > 0) && (max(gKillMgr.at4, gKillMgr.at0) > 0))
@@ -1672,7 +1669,7 @@ void viewDrawAimedPlayerName(void)
         if (IsPlayerSprite(pSprite))
         {
             char nPlayer = pSprite->type-kDudePlayer1;
-            if (!VanillaMode() && powerupCheck(&gPlayer[nPlayer], kPwUpDoppleganger) && ((gGameOptions.nGameType != kGameTypeTeams) || !IsTargetTeammate(gView, gPlayer[nPlayer].pSprite))) // if doppleganger powerup is active, set player id as viewer
+            if (!VanillaMode() && powerupCheck(&gPlayer[nPlayer], kPwUpDoppleganger) && !IsTargetTeammate(gView, gPlayer[nPlayer].pSprite)) // if doppleganger powerup is active, set player id as viewer
                 nPlayer = gView->pSprite->type-kDudePlayer1;
             char* szName = gProfile[nPlayer].name;
             int nPalette = !VanillaMode() ? playerColorPalAimName(gPlayer[nPlayer].teamId) : playerColorPalDefault(gPlayer[nPlayer].teamId);
@@ -1755,7 +1752,7 @@ void viewDrawPlayerFrags(void)
         int y = 9 * (i / 4);
         int col = playerColorPalDefault(gPlayer[p].teamId);
         char* name = gProfile[p].name;
-        if (gProfile[p].skill == 2)
+        if ((gProfile[p].skill == 2) || (gGameOptions.uNetGameFlags&kNetGameFlagSkillIssue))
             sprintf(gTempStr, "%s", name);
         else
             sprintf(gTempStr, "%s [%d]", name, gProfile[p].skill);
@@ -3477,7 +3474,7 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                     pTSprite->shade = -128;
                     pTSprite->pal = 5;
                 } else if (powerupCheck(pPlayer, kPwUpDoppleganger) && (VanillaMode() || !bIsTeammate)) {
-                    pTSprite->pal = !VanillaMode() ? playerColorPalSprite(gView->teamId) : playerColorPalDefault(gView->teamId);
+                    pTSprite->pal = !VanillaMode() && !(gGameOptions.uNetGameFlags&kNetGameFlagNoTeamColors) ? playerColorPalSprite(gView->teamId) : playerColorPalDefault(gView->teamId);
                 }
                 
                 if (powerupCheck(pPlayer, kPwUpReflectShots)) {
@@ -4741,7 +4738,35 @@ RORHACK:
     }
     if (gViewMode == 4)
     {
-        gViewMap.Process(gView->pSprite);
+        int cX = 0, cY = 0, nAng = 0;
+        if (gViewMap.bFollowMode) // calculate get current player position for 2d map for follow mode
+        {
+            cX = gView->pSprite->x, cY = gView->pSprite->y, nAng = gView->pSprite->ang;
+            if (!VanillaMode()) // interpolate angle for 2d map view
+            {
+                fix16_t cA = gView->q16ang;
+                if (gViewInterpolate)
+                {
+                    if (numplayers > 1 && gView == gMe && gPrediction && gMe->pXSprite->health > 0)
+                    {
+                        cX = interpolate(predictOld.at50, predict.at50, gInterpolate);
+                        cY = interpolate(predictOld.at54, predict.at54, gInterpolate);
+                        cA = interpolateangfix16(predictOld.at30, predict.at30, gInterpolate);
+                    }
+                    else
+                    {
+                        VIEW *pView = &gPrevView[gViewIndex];
+                        cX = interpolate(pView->at50, cX, gInterpolate);
+                        cY = interpolate(pView->at54, cY, gInterpolate);
+                        cA = interpolateangfix16(pView->at30, cA, gInterpolate);
+                    }
+                }
+                if (gView == gMe && (numplayers <= 1 || gPrediction) && gView->pXSprite->health != 0)
+                    cA = gViewAngle;
+                nAng = fix16_to_int(cA);
+            }
+        }
+        gViewMap.Process(cX, cY, nAng);
     }
     viewDrawInterface(delta);
     int zn = ((gView->zWeapon-gView->zView-(12<<8))>>7)+220;

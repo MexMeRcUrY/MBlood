@@ -99,15 +99,18 @@ It should be noted that vanilla mode does not work with modern maps
    - Leave all hitbox sizes as original
 * Napalm gravity falloff
    - For player spawned napalm projectiles, make gravity affect their trajectory path
-* Enemy behavior
+* Enemy behavior (NBlood)
    - Fixes various original 1.21 bugs with enemies such as:
    - Tiny Caleb using the wrong burning sprite
    - Enemies sometimes burning indefinitely
    - Ignited cultists switching weapons when extinguished in water
    - Cerberus spinning uselessly on lava
-   - Improved beast stomp attack sector scanning
    - Check if enemy is alive before setting target for AI
    - Fixes tesla cultists bugged prone attack sequence
+* Enemy behavior (NotBlood)
+   - All of the above fixes and including:
+   - Improved beast stomp attack sector scanning
+   - Fix bloated butchers cleavers hitting prone players
    - Turn enemy around if stuck running into a corner for a few seconds
 * Random cultist TNT
    - This will make cultists use a variety of random thrown sprites such as:
@@ -178,6 +181,8 @@ It should be noted that vanilla mode does not work with modern maps
 * SNEAKYFU - Proned shotgun/tommy gun cultists only
 
 ### New console variables for NotBlood
+* cl_autodivingsuit
+   - Enable/disable automatic diving suit equipping when entering water (always enabled in multiplayer)
 * cl_calebtalk
    - Enable/disable Caleb's dialog lines (0: on, 1: no idle, 2: no explosion/gib, 3: off)
 * cl_chatsnd
@@ -194,6 +199,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable random obituary kill messages
 * cl_multikill
    - Enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)
+* cl_stompkill
+   - Enable/disable sound effect when stomp killing another player. The sound can be changed by replacing the 'notblood.pk3/NOTSTOMP.RAW' file
 * cl_weaponhbob
    - Enable/disable view horizontal bobbing
 * cl_rollangle
@@ -280,7 +287,7 @@ It should be noted that vanilla mode does not work with modern maps
 * snd_earangle
    - Set the listening ear offset (15-90 degrees)
 * snd_ding
-   - Enable/disable hit noise when damaging an enemy. The sound can be changed by replacing the 'notblood.pk3/HITSOUND.RAW' file
+   - Enable/disable hit noise when damaging an enemy. The sound can be changed by replacing the 'notblood.pk3/NOTHIT.RAW' file
 * snd_dingvol
    - Set volume for hit sound (default: 75, range: 1-255)
 * snd_dingminfreq

@@ -706,9 +706,10 @@ CGameMenuItemChain::CGameMenuItemChain()
     at2c = NULL;
     at30 = 0;
     nPalOverride = 0;
+    m_pzText2 = NULL;
 }
 
-CGameMenuItemChain::CGameMenuItemChain(const char *a1, int a2, int a3, int a4, int a5, int a6, CGameMenu *a7, int a8, void(*a9)(CGameMenuItemChain *), int a10, int palOverride)
+CGameMenuItemChain::CGameMenuItemChain(const char *a1, int a2, int a3, int a4, int a5, int a6, CGameMenu *a7, int a8, void(*a9)(CGameMenuItemChain *), int a10, int palOverride, const char *pzText2)
 {
     m_pzText = a1;
     m_nFont = a2;
@@ -721,6 +722,7 @@ CGameMenuItemChain::CGameMenuItemChain(const char *a1, int a2, int a3, int a4, i
     at2c = a9;
     at30 = a10;
     nPalOverride = palOverride;
+    m_pzText2 = pzText2;
 }
 
 void CGameMenuItemChain::Draw(void)
@@ -747,6 +749,13 @@ void CGameMenuItemChain::Draw(void)
         break;
     }
     gMenuTextMgr.DrawText(m_pzText, m_nFont, x, m_nY, shade, pal, true);
+    if (m_pzText2)
+    {
+        int width2;
+        gMenuTextMgr.GetFontInfo(m_nFont, m_pzText2, &width2, NULL);
+        gMenuTextMgr.DrawText(m_pzText2, m_nFont, m_nX + m_nWidth - 1 - width2, y, shade, pal, false);
+        width = m_nWidth;
+    }
     if (bEnable && MOUSEACTIVECONDITIONAL(!gGameMenuMgr.MouseOutsideBounds(&gGameMenuMgr.m_mousepos, x<<16, y<<16, width<<16, height<<16)))
     {
         if (MOUSEWATCHPOINTCONDITIONAL(!gGameMenuMgr.MouseOutsideBounds(&gGameMenuMgr.m_prevmousepos, x<<16, y<<16, width<<16, height<<16)))
@@ -1685,6 +1694,7 @@ void CGameMenuItemZEdit::Draw(void)
 bool CGameMenuItemZEdit::Event(CGameMenuEvent &event)
 {
     static char buffer[256];
+    static CGameMenuItemZEdit *pGameMenuItemZEdit = NULL;
     // Hack
     if (event.at2 == sc_kpad_2 || event.at2 == sc_kpad_4 || event.at2 == sc_kpad_6 || event.at2 == sc_kpad_8)
         event.at0 = kMenuEventKey;
@@ -1696,6 +1706,7 @@ bool CGameMenuItemZEdit::Event(CGameMenuEvent &event)
             strncpy(at20, buffer, at24);
             at20[at24-1] = 0;
             at30 = 0;
+            pGameMenuItemZEdit = NULL;
             return false;
         }
         return true;
@@ -1712,6 +1723,13 @@ bool CGameMenuItemZEdit::Event(CGameMenuEvent &event)
                 at2c(this, &event);
             at30 = 0;
             return false;
+        }
+        else // unselect previously edited item
+        {
+            if (!pGameMenuItemZEdit)
+                pGameMenuItemZEdit = this;
+            else if (pGameMenuItemZEdit != this)
+                pGameMenuItemZEdit->at30 = 0, pGameMenuItemZEdit = this;
         }
         strncpy(buffer, at20, at24);
         buffer[at24-1] = 0;

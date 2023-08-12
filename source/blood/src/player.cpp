@@ -68,6 +68,9 @@ bool gRedFlagDropped = false;
 int gPlayerScores[kMaxPlayers];
 ClockTicks gPlayerScoreTicks[kMaxPlayers];
 
+int gPlayerRoundLimit = 0;
+char gPlayerRoundEnding = 0;
+
 int gPlayerLastKiller;
 int gPlayerLastVictim;
 ClockTicks gPlayerKillMsgTicks;
@@ -246,7 +249,7 @@ KILLMSG gSuicide[] = {
     { "\r%s\r has suicided", 4207 },
 };
 
-KILLMSG gKillingSpreeFrag = {"\r%s\r's killing spree was ended by \r%s\r", 4110};
+KILLMSG gKillingSpreeFrag = {"\r%s\r put a stop to \r%s\r's killing spree", 4110};
 
 KILLMSG gKillingSpreeSuicide = {"\r%s\r was looking good until they killed themselves", 4207};
 
@@ -256,7 +259,7 @@ struct DAMAGEINFO {
     int at10[3];
 };
 
-DAMAGEINFO damageInfo[7] = {
+DAMAGEINFO damageInfo[kDamageMax] = {
     { -1, 731, 732, 733, 710, 710, 710 },
     { 1, 742, 743, 744, 711, 711, 711 },
     { 0, 731, 732, 733, 712, 712, 712 },
@@ -652,9 +655,10 @@ void playerSetRace(PLAYER *pPlayer, int nLifeMode)
     
     // By NoOne: don't forget to change clipdist for grow and shrink modes
     pPlayer->pSprite->clipdist = pDudeInfo->clipdist;
-    
+
+    const int nSkill = !(gGameOptions.uNetGameFlags&kNetGameFlagSkillIssue) ? gProfile[pPlayer->nPlayer].skill : gGameOptions.nDifficulty;
     for (int i = 0; i < kDamageMax; i++)
-        pDudeInfo->curDamage[i] = mulscale8(Handicap[gProfile[pPlayer->nPlayer].skill], pDudeInfo->startDamage[i]);
+        pDudeInfo->curDamage[i] = mulscale8(Handicap[nSkill], pDudeInfo->startDamage[i]);
 }
 
 void playerSetGodMode(PLAYER *pPlayer, char bGodMode)
@@ -1010,7 +1014,7 @@ void playerStart(int nPlayer, int bNewLevel)
     int top, bottom;
     GetSpriteExtents(pSprite, &top, &bottom);
     pSprite->z -= bottom - pSprite->z;
-    pSprite->pal = !VanillaMode() ? playerColorPalSprite(pPlayer->teamId) : playerColorPalDefault(pPlayer->teamId);
+    pSprite->pal = !VanillaMode() && !(gGameOptions.uNetGameFlags&kNetGameFlagNoTeamColors) ? playerColorPalSprite(pPlayer->teamId) : playerColorPalDefault(pPlayer->teamId);
     pPlayer->angold = pSprite->ang = pStartZone->ang;
     pPlayer->q16ang = fix16_from_int(pSprite->ang);
     pSprite->type = kDudePlayer1+nPlayer;
@@ -1263,7 +1267,7 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
         #endif
         case kItemFlagABase:
         case kItemFlagBBase: {
-            if (gGameOptions.nGameType != kGameTypeTeams || pItem->extra <= 0) return 0;
+            if (gGameOptions.nGameType != kGameTypeTeams || pItem->extra <= 0 || gPlayerRoundEnding) return 0;
             XSPRITE * pXItem = &xsprite[pItem->extra];
             const int nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(pPlayer->teamId) : 0;
             if (pItem->type == kItemFlagABase) {
@@ -1298,6 +1302,8 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
                         sprintf(buffer, "\r%s\r captured \rRed Flag\r!", gProfile[pPlayer->nPlayer].name);
                         sndStartSample(8001, 255, 2, 0);
                         viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, kFlagRedPal);
+                        if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
+                            playerProcessRoundCheck();
 #if 0
                         if (dword_28E3D4 == 3 && myconnectindex == connecthead)
                         {
@@ -1342,6 +1348,8 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
                         sprintf(buffer, "\r%s\r captured \rBlue Flag\r!", gProfile[pPlayer->nPlayer].name);
                         sndStartSample(8000, 255, 2, 0);
                         viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, kFlagBluePal);
+                        if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
+                            playerProcessRoundCheck();
 #if 0
                         if (dword_28E3D4 == 3 && myconnectindex == connecthead)
                         {
@@ -1700,12 +1708,13 @@ void ProcessInput(PLAYER *pPlayer)
         gViewLookAdjust = 0.f;
     }
 
-    pPlayer->isRunning = pInput->syncFlags.run;
+    pPlayer->isRunning = gProfile[pPlayer->nPlayer].nWeaponHBobbing == 2 ? pInput->syncFlags.run : 0; // v1.0x weapon swaying 
     if (pInput->buttonFlags.byte || pInput->forward || pInput->strafe || pInput->q16turn)
         pPlayer->restTime = 0;
     else if (pPlayer->restTime >= 0)
         pPlayer->restTime += kTicsPerFrame;
-    WeaponProcess(pPlayer);
+    if (VanillaMode() || pXSprite->health == 0)
+        WeaponProcess(pPlayer);
     if (pXSprite->health == 0)
     {
         char bSeqStat = playerSeqPlaying(pPlayer, 16);
@@ -2035,6 +2044,8 @@ void ProcessInput(PLAYER *pPlayer)
             pPlayer->q16slopehoriz = 0;
     }
     pPlayer->slope = (-fix16_to_int(pPlayer->q16horiz))<<7;
+    if (!VanillaMode())
+        WeaponProcess(pPlayer);
     if (pInput->keyFlags.prevItem)
     {
         pInput->keyFlags.prevItem = 0;
@@ -2147,12 +2158,9 @@ void playerProcess(PLAYER *pPlayer)
     {
         if (pXSprite->height < 256)
         {
-            int isRunning = pPlayer->isRunning;
-            if (gProfile[pPlayer->nPlayer].nWeaponHBobbing == 2) // v1.0x weapon swaying
-                isRunning = 1; // always running
-            pPlayer->bobAmp = (pPlayer->bobAmp+pPosture->pace[isRunning]*4) & 2047;
-            pPlayer->swayAmp = (pPlayer->swayAmp+(pPosture->pace[isRunning]*4)/2) & 2047;
-            const int clampPhase = isRunning ? 60 : 30;
+            pPlayer->bobAmp = (pPlayer->bobAmp+pPosture->pace[pPlayer->isRunning]*4) & 2047;
+            pPlayer->swayAmp = (pPlayer->swayAmp+(pPosture->pace[pPlayer->isRunning]*4)/2) & 2047;
+            const int clampPhase = pPlayer->isRunning ? 60 : 30;
             if (pPlayer->bobPhase < clampPhase)
                 pPlayer->bobPhase = ClipHigh(pPlayer->bobPhase+nSpeed, clampPhase);
         }
@@ -2207,6 +2215,8 @@ void playerProcess(PLAYER *pPlayer)
             seqSpawn(dudeInfo[nType].seqStartID+8, 3, nXSprite, -1);
         break;
     }
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // check every tick
+        playerProcessRoundCheck();
 }
 
 spritetype *playerFireMissile(PLAYER *pPlayer, int a2, int a3, int a4, int a5, int a6)
@@ -2237,8 +2247,8 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
     dassert(nKiller >= 0 && nKiller < kMaxPlayers);
     int nVictim = pVictim->pSprite->type-kDudePlayer1;
     dassert(nVictim >= 0 && nVictim < kMaxPlayers);
-    const ClockTicks nKillingSpreeTime = kTicRate * 3; // three seconds window for kill sprees
-    const char bKillingSpreeStopped = !VanillaMode() && (gGameOptions.nGameType >= kGameTypeBloodBath) && gMultiKill && (gMultiKillsFrags[nVictim] >= 5) && ((gFrameClock - gMultiKillsTicks[nVictim]) < nKillingSpreeTime);
+    const ClockTicks kKillingSpreeTime = kTicRate * 5; // five seconds window for kill sprees
+    const char bKillingSpreeStopped = !VanillaMode() && (gGameOptions.nGameType >= kGameTypeBloodBath) && gMultiKill && (gMultiKillsFrags[nVictim] >= 5) && ((gFrameClock - gMultiKillsTicks[nVictim]) < kKillingSpreeTime);
     if (myconnectindex == connecthead)
     {
         sprintf(buffer, "frag %d killed %d\n", pKiller->nPlayer+1, pVictim->nPlayer+1);
@@ -2314,7 +2324,7 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
         if (!VanillaMode() && (gGameOptions.nGameType >= kGameTypeBloodBath) && bKilledEnemy) // calculate multi kill/killing spree for bloodbath/teams mode (ignore friendly fire)
         {
             const char bKillerAlive = pKiller->pXSprite->health > 0;
-            const char bKillerSpreeActive = (gFrameClock - gMultiKillsTicks[nKiller]) < nKillingSpreeTime;
+            const char bKillerSpreeActive = (gFrameClock - gMultiKillsTicks[nKiller]) < kKillingSpreeTime;
             if (bKillerSpreeActive && bKillerAlive) // if killed enemy within multi kill time window, reward point
             {
                 gMultiKillsFrags[nKiller]++;
@@ -2356,7 +2366,7 @@ void FragPlayer(PLAYER *pPlayer, int nSprite)
     spritetype *pSprite = NULL;
     if (nSprite >= 0)
         pSprite = &sprite[nSprite];
-    if (pSprite && IsPlayerSprite(pSprite))
+    if (pSprite && IsPlayerSprite(pSprite) && !gPlayerRoundEnding)
     {
         PLAYER *pKiller = &gPlayer[pSprite->type - kDudePlayer1];
         playerFrag(pKiller, pPlayer);
@@ -2376,6 +2386,77 @@ void FragPlayer(PLAYER *pPlayer, int nSprite)
             else
                 evSend(0, 0, 15, kCmdToggle, pPlayer->nSprite);
         }
+    }
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
+        playerProcessRoundCheck();
+}
+
+void playerInitRoundCheck(void)
+{
+    gPlayerRoundLimit = gPlayerRoundEnding = 0;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit5)
+        gPlayerRoundLimit += 5;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit10)
+        gPlayerRoundLimit += 10;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit20)
+        gPlayerRoundLimit += 20;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit50)
+        gPlayerRoundLimit += 50;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit100)
+        gPlayerRoundLimit += 100;
+
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // convert to minutes
+        gPlayerRoundLimit *= kTicsPerSec*60;
+}
+
+void playerProcessRoundCheck(void)
+{
+    if (gGameOptions.nGameType <= kGameTypeCoop) // frag limits do not apply here, return
+        return;
+    if (gPlayerRoundEnding) // we're already ending the round, don't trigger this again
+        return;
+
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes)
+    {
+        if (gLevelTime <= gPlayerRoundLimit) // if time limit has not been reached
+            return;
+    }
+
+    int nScore = INT_MIN, nWinner = 0;
+    if (gGameOptions.nGameType == kGameTypeBloodBath)
+    {
+        for (int p = connecthead; p >= 0; p = connectpoint2[p])
+        {
+            if (nScore < gPlayer[p].fragCount)
+                nScore = gPlayer[p].fragCount, nWinner = p;
+        }
+    }
+    else if (gGameOptions.nGameType == kGameTypeTeams)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            if (nScore < gPlayerScores[i])
+                nScore = gPlayerScores[i], nWinner = i;
+        }
+    }
+
+    if ((gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) || (nScore >= gPlayerRoundLimit))
+    {
+        char buffer[80] = "Ending round...";
+        int nPal = 0;
+        if (gGameOptions.nGameType == kGameTypeBloodBath)
+        {
+            sprintf(buffer, "\r%s\r is the winner", gProfile[nWinner].name);
+            nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(gPlayer[nWinner].teamId) : 0;
+        }
+        else if (gGameOptions.nGameType == kGameTypeTeams)
+        {
+            sprintf(buffer, "\r%s\r is the winner", nWinner ? "Red Team" : "Blue Team");
+            nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(nWinner) : 0;
+        }
+        viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal);
+        evPost(kLevelExitNormal, 3, kTicRate * 5, kCallbackEndLevel); // trigger level end in five seconds
+        gPlayerRoundEnding = 1;
     }
 }
 
@@ -2458,7 +2539,8 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
             const DUDEINFO *pDudeInfo = getDudeInfo(pPlayer->pSprite->type);
             const XSPRITE *pXSprite = pPlayer->pXSprite;
             const int nHealth = clamp(pXSprite->health / ((pDudeInfo->startHealth<<4)>>3), 0, kInvulSteps-1); // divide health into invul array range (0-7)
-            const int nInvulTicks = ((invulTimers[nHealth]/4) * (4-gProfile[pPlayer->nPlayer].skill+1))>>1; // scale invul ticks depending on current difficulty
+            const int nSkill = !(gGameOptions.uNetGameFlags&kNetGameFlagSkillIssue) ? gProfile[pPlayer->nPlayer].skill : gGameOptions.nDifficulty;
+            const int nInvulTicks = ((invulTimers[nHealth]/4) * (4-nSkill+1))>>1; // scale invul ticks depending on current difficulty
             const char bInvulState = pPlayer->invulTime > (gFrameClock - nInvulTicks);
             if ((pPlayer->invulTime != gFrameClock) && bInvulState) // if invulnerability timer has not lapsed for difficulty, bypass damage calculation
                 return 0;

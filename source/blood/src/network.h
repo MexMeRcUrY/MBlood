@@ -69,11 +69,16 @@ extern NETWORKMODE gNetMode;
 extern char gNetAddress[32];
 extern int gNetPort;
 
+extern void netIRCDeinitialize(void);
+extern int netIRCIinitialize(void);
+extern int netIRCProcess(void);
+
 
 struct PKT_STARTGAME {
     short version;
     char gameType, difficulty, monsterSettings, weaponSettings, itemSettings, respawnSettings, keySettings, itemWeaponSettings, randomizerMode;
     char episodeId, levelId;
+    unsigned int uNetGameFlags;
     char userMap, userMapName[BMAX_PATH];
     char monsterQuantity, monsterHealth, monsterSpeed;
     bool bQuadDamagePowerup;
@@ -81,7 +86,7 @@ struct PKT_STARTGAME {
     int nExplosionBehavior;
     int nProjectileBehavior;
     bool bNapalmFalloff;
-    bool bEnemyBehavior;
+    int nEnemyBehavior;
     bool bEnemyRandomTNT;
     int nWeaponsVer;
     bool bSectorBehavior;
@@ -161,7 +166,7 @@ void netBroadcastFart(int nPlayer);
 void CalcGameChecksum(void);
 void netBroadcastPlayerLogoff(int nPlayer);
 void netBroadcastMyLogoff(bool bRestart);
-void netInitialize(bool bConsole);
+void netInitialize(bool bConsole, bool bAnnounce = false);
 void netBroadcastPlayerInfo(int nPlayer);
 void netBroadcastPlayerInfoUpdate(int nPlayer);
 void netCheckSync(void);

@@ -57,7 +57,7 @@ struct DEMOVALIDATE {
     int nAutoAim;
 };
 
-DEMOVALIDATE gDemoValidate[] = {
+const DEMOVALIDATE gDemoValidate[] = {
     {"/validatedemos/TEST000.DEM", (int32_t)0x00000DB1, 0x68E811AD, 0x00000000, {(int32_t)0x00002239, (int32_t)0x00006A75, (int32_t)0x000029A4}, 1},
     {"/validatedemos/TEST001.DEM", (int32_t)0x000008E3, 0x898BFCFE, 0x00000000, {(int32_t)0x00001AC0, (int32_t)0x00003F49, (int32_t)0x000025A4}, 1},
     {"/validatedemos/TEST002.DEM", (int32_t)0x00000CE0, 0xCAF89634, 0x00000000, {(int32_t)0x0000C8ED, (int32_t)0x00009AF9, (int32_t)0x000159A4}, 1},
@@ -174,6 +174,11 @@ DEMOVALIDATE gDemoValidate[] = {
     {"/validatedemos/TEST112.DEM", (int32_t)0x00003F4C, 0x50D29210, 0x00000000, {(int32_t)0x0000F6A1, (int32_t)0xFFFED26B, (int32_t)0x00024DA4}, 1},
     {"/validatedemos/TEST113.DEM", (int32_t)0x000025DC, 0xCD2519A0, 0x0000001F, {(int32_t)0xFFFFFA41, (int32_t)0xFFFFD353, (int32_t)0x0000FD50}, 0},
     {"/validatedemos/TEST114.DEM", (int32_t)0x00001664, 0x62DBFA86, 0x00000000, {(int32_t)0x0000787B, (int32_t)0xFFFFDB53, (int32_t)0x000019A4}, 1},
+    {"/validatedemos/TEST115.DEM", (int32_t)0x00001B5E, 0xB8CFF3D2, 0x00000000, {(int32_t)0xFFFF37FF, (int32_t)0xFFFFDB3F, (int32_t)0x0000E9A4}, 1},
+    {"/validatedemos/TEST116.DEM", (int32_t)0x0000638C, 0xBB29CB40, 0x00000405, {(int32_t)0xFFFF7632, (int32_t)0x000053F7, (int32_t)0xFFFF8D50}, 1},
+    {"/validatedemos/TEST117.DEM", (int32_t)0x00001549, 0xABD36DE5, 0x00000640, {(int32_t)0x00009ACB, (int32_t)0x00006CC1, (int32_t)0x00003550}, 1}, // this demo crashes DOS v1.21 (ERROR (3339) src\actor.cpp Bad Dude Failed: initial=0 type=0 NORMAL)
+    {"/validatedemos/TEST118.DEM", (int32_t)0x00001B56, 0xF88C22B7, 0x00000640, {(int32_t)0x00009C57, (int32_t)0x00006F1B, (int32_t)0x00003550}, 1},
+    {"/validatedemos/TEST119.DEM", (int32_t)0x00000E93, 0x499EF35B, 0x00000000, {(int32_t)0x00009AD5, (int32_t)0x000096BC, (int32_t)0x000159A4}, 1},
 };
 
 int nBuild = 0;
@@ -529,7 +534,7 @@ void CDemo::ProcessKeys(void)
 
 void CDemo::Playback(void)
 {
-    DEMOVALIDATE *pValidateInfo;
+    const DEMOVALIDATE *pValidateInfo;
     CONTROL_BindsEnabled = false;
     ready2send = 0;
     int v4 = 0;
@@ -687,6 +692,10 @@ _DEMOPLAYBACK:
             {
                 if (gGameStarted) // dim background
                     viewDimScreen();
+                if (gGameMenuMgr.pActiveMenu == &menuNetworkBrowser) // search for servers
+                    netIRCProcess();
+                else // exited server browser, gracefully disconnect from master list
+                    netIRCDeinitialize();
                 gGameMenuMgr.Draw();
             }
             else if (gDemoRunValidation) // keep game locked
