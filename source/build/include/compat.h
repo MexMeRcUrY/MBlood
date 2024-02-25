@@ -7,6 +7,17 @@
 
 #pragma once
 
+#ifndef __APPLE__
+#include <malloc.h>
+#endif
+#include <stdlib.h>
+#include <string.h>
+
+#if USE_MIMALLOC != 0
+# include "mimalloc.h"
+# include "mimalloc-override.h"
+#endif
+
 #ifdef _WIN32
 # include "windows_inc.h"
 #endif
@@ -451,8 +462,6 @@ defined __x86_64__ || defined __amd64__ || defined _M_X64 || defined _M_IA64 || 
 #ifndef USE_PHYSFS
 #include <stdio.h>
 #endif
-#include <stdlib.h>
-#include <string.h>
 
 #if !(defined _WIN32 && defined __clang__)
 #include <float.h>
@@ -759,20 +768,6 @@ void eduke32_exit_return(int) ATTRIBUTE((noreturn));
 # define PRIxPTR "x"
 # undef SCNx32
 # define SCNx32 "x"
-#endif
-
-#if defined EDUKE32_OSX
-# if !defined __x86_64__ && defined __GNUC__
-// PK 20110617: is*() crashes for me in x86 code compiled from 64-bit, and gives link errors on ppc
-//              This hack patches all occurences.
-#  define isdigit(ch) ({ int32_t c__dontuse_=ch; c__dontuse_>='0' && c__dontuse_<='9'; })
-#  define isalpha(ch) ({ int32_t c__dontuse2_=ch; (c__dontuse2_>='A' && c__dontuse2_<='Z') || (c__dontuse2_>='a' && c__dontuse2_<='z'); })
-#  define isalnum(ch2)  ({ int32_t c2__dontuse_=ch2; isalpha(c2__dontuse_) || isdigit(c2__dontuse_); })
-#  if defined __BIG_ENDIAN__
-#   define isspace(ch)  ({ int32_t c__dontuse_=ch; (c__dontuse_==' ' || c__dontuse_=='\t' || c__dontuse_=='\n' || c__dontuse_=='\v' || c__dontuse_=='\f' || c__dontuse_=='\r'); })
-#   define isprint(ch)  ({ int32_t c__dontuse_=ch; (c__dontuse_>=0x20 && c__dontuse_<0x7f); })
-#  endif
-# endif
 #endif
 
 
@@ -1334,8 +1329,8 @@ static FORCE_INLINE void xalloc_set_location(int32_t const line, const char * co
 }
 #endif
 
-void set_memerr_handler(void (*handlerfunc)(int32_t, const char *, const char *));
-EDUKE32_NORETURN void handle_memerr(void);
+void set_memerr_handler(void (*handlerfunc)(int32_t, int32_t, const char *, const char *));
+EDUKE32_NORETURN void handle_memerr(int32_t bytes);
 
 #ifdef __cplusplus
 #include "smmalloc.h"
@@ -1371,7 +1366,7 @@ static FORCE_INLINE char *xstrdup(const char *s)
         ptr[len-1] = '\0';
         return ptr;
     }
-    handle_memerr();
+    handle_memerr(len);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
@@ -1379,7 +1374,7 @@ static FORCE_INLINE void *xmalloc(bsize_t const size)
 {
     void *ptr = _sm_malloc(g_sm_heap, size, ALLOC_ALIGNMENT);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr)) return ptr;
-    handle_memerr();
+    handle_memerr(size);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
@@ -1392,7 +1387,7 @@ static FORCE_INLINE void *xcalloc(bsize_t const nmemb, bsize_t const size)
         Bmemset(ptr, 0, siz);
         return ptr;
     }
-    handle_memerr();
+    handle_memerr(size);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
@@ -1405,7 +1400,7 @@ static FORCE_INLINE void *xrealloc(void * const ptr, bsize_t const size)
     //  - size == 0 make it behave like free() if ptr != NULL
     // Since we want to catch an out-of-mem in the first case, this leaves:
     if (EDUKE32_PREDICT_TRUE(newptr != nullptr || size == 0)) return newptr;
-    handle_memerr();
+    handle_memerr(size);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
@@ -1415,7 +1410,7 @@ static FORCE_INLINE void *xaligned_alloc(bsize_t const alignment, bsize_t const 
 {
     void *ptr = _sm_malloc(g_sm_heap, size, alignment);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr)) return ptr;
-    handle_memerr();
+    handle_memerr(size);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
@@ -1428,7 +1423,7 @@ static FORCE_INLINE void *xaligned_calloc(bsize_t const alignment, bsize_t const
         Bmemset(ptr, 0, blocksize);
         return ptr;
     }
-    handle_memerr();
+    handle_memerr(size);
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 

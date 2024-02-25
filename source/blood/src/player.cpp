@@ -436,7 +436,7 @@ void powerupSetState(PLAYER *pPlayer, int nPowerUp, char bState)
 
 void powerupProcess(PLAYER *pPlayer)
 {
-    pPlayer->packItemTime = ClipLow(pPlayer->packItemTime-4, 0);
+    pPlayer->packItemTime = ClipLow(pPlayer->packItemTime-kTicsPerFrame, 0);
     for (int i = kMaxPowerUps-1; i >= 0; i--)
     {
         int nPack = powerupToPackItem(i);
@@ -444,7 +444,7 @@ void powerupProcess(PLAYER *pPlayer)
         {
             if (pPlayer->packSlots[nPack].isActive)
             {
-                pPlayer->pwUpTime[i] = ClipLow(pPlayer->pwUpTime[i]-4, 0);
+                pPlayer->pwUpTime[i] = ClipLow(pPlayer->pwUpTime[i]-kTicsPerFrame, 0);
                 if (pPlayer->pwUpTime[i])
                     pPlayer->packSlots[nPack].curAmount = (100*pPlayer->pwUpTime[i])/gPowerUpInfo[i].bonusTime;
                 else
@@ -464,7 +464,7 @@ void powerupProcess(PLAYER *pPlayer)
                 else
                     sfxPlay3DSoundCP(pPlayer->pSprite, 776, -1, 0, 0, 192, "NOTBLOOD1");
             }
-            pPlayer->pwUpTime[i] = ClipLow(pPlayer->pwUpTime[i]-4, 0);
+            pPlayer->pwUpTime[i] = ClipLow(pPlayer->pwUpTime[i]-kTicsPerFrame, 0);
             if (!pPlayer->pwUpTime[i])
                 powerupDeactivate(pPlayer, i);
         }
@@ -868,7 +868,7 @@ void playerResetPosture(PLAYER* pPlayer) {
         pPlayer->swayWidth = 0;
     }
     if (pPlayer == gMe) // only reset crouch toggle state if resetting our own posture
-        gCrouchToggleState = 0;
+        gCrouchToggleState = 0; // reset crouch toggle state
 }
 
 static void playerResetTeamId(int nPlayer, int bNewLevel)
@@ -896,6 +896,8 @@ static void playerResetTeamId(int nPlayer, int bNewLevel)
             viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPalPlayer, nPalTeam);
         }
     }
+    else if (gProfile[nPlayer].nColorPreference > 0)
+        pPlayer->teamId = gProfile[nPlayer].nColorPreference-1;
 }
 
 const int nZoneRandList[kMaxPlayers][kMaxPlayers] = {
@@ -1038,7 +1040,7 @@ void playerStart(int nPlayer, int bNewLevel)
     int top, bottom;
     GetSpriteExtents(pSprite, &top, &bottom);
     pSprite->z -= bottom - pSprite->z;
-    pSprite->pal = !VanillaMode() && !(gGameOptions.uNetGameFlags&kNetGameFlagNoTeamColors) ? playerColorPalSprite(pPlayer->teamId) : playerColorPalDefault(pPlayer->teamId);
+    pSprite->pal = !VanillaMode() && (gGameOptions.nGameType == kGameTypeTeams) && !(gGameOptions.uNetGameFlags&kNetGameFlagNoTeamColors) && (gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly || !gProfile[pPlayer->nPlayer].nModel) ? playerColorPalSprite(pPlayer->teamId) : playerColorPalDefault(pPlayer->teamId);
     pPlayer->angold = pSprite->ang = pStartZone->ang;
     pPlayer->q16ang = fix16_from_int(pSprite->ang);
     pSprite->type = kDudePlayer1+nPlayer;
@@ -1770,7 +1772,15 @@ void ProcessInput(PLAYER *pPlayer)
             else if (!gDemo.bPlaying && (seqGetStatus(3, pPlayer->pSprite->extra) < 0))
             {
                 if (pPlayer->pSprite)
-                    pPlayer->pSprite->type = kThingBloodChunks;
+                {
+                    if ((gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly) && gProfile[pPlayer->nPlayer].nModel && !VanillaMode()) // set to unused thing, so it can be easily replaced with cultist tile
+                    {
+                        pPlayer->pSprite->inittype = pPlayer->pSprite->type;
+                        pPlayer->pSprite->type = kThingVoodooHead;
+                    }
+                    else
+                        pPlayer->pSprite->type = kThingBloodChunks;
+                }
                 actPostSprite(pPlayer->nSprite, kStatThing);
                 seqSpawn(pPlayer->pDudeInfo->seqStartID+15, 3, pPlayer->pSprite->extra, -1);
                 playerReset(pPlayer);
@@ -1966,7 +1976,7 @@ void ProcessInput(PLAYER *pPlayer)
         }
         }
         if (pPlayer->handTime > 0)
-            pPlayer->handTime = ClipLow(pPlayer->handTime-4*(6-gGameOptions.nDifficulty), 0);
+            pPlayer->handTime = ClipLow(pPlayer->handTime-kTicsPerFrame*(6-gGameOptions.nDifficulty), 0);
         if (pPlayer->handTime <= 0 && pPlayer->hand)
         {
             spritetype *pSprite2 = actSpawnDude(pPlayer->pSprite, kDudeHand, pPlayer->pSprite->clipdist<<1, 0);
@@ -2170,7 +2180,7 @@ void playerProcess(PLAYER *pPlayer)
     else
         pPlayer->zWeaponVel += mulscale16(dz<<8, 0xc00);
     pPlayer->zWeapon += pPlayer->zWeaponVel>>8;
-    pPlayer->bobPhase = ClipLow(pPlayer->bobPhase-4, 0);
+    pPlayer->bobPhase = ClipLow(pPlayer->bobPhase-kTicsPerFrame, 0);
     nSpeed >>= 16;
     if (pPlayer->posture == kPostureSwim)
     {
@@ -2197,12 +2207,12 @@ void playerProcess(PLAYER *pPlayer)
         pPlayer->swayWidth = mulscale30(pPosture->swayH*pPlayer->bobPhase, Sin(pPlayer->swayAmp-0x155));
     }
     pPlayer->flickerEffect = 0;
-    pPlayer->quakeEffect = ClipLow(pPlayer->quakeEffect-4, 0);
-    pPlayer->tiltEffect = ClipLow(pPlayer->tiltEffect-4, 0);
-    pPlayer->visibility = ClipLow(pPlayer->visibility-4, 0);
-    pPlayer->painEffect = ClipLow(pPlayer->painEffect-4, 0);
-    pPlayer->blindEffect = ClipLow(pPlayer->blindEffect-4, 0);
-    pPlayer->pickupEffect = ClipLow(pPlayer->pickupEffect-4, 0);
+    pPlayer->quakeEffect = ClipLow(pPlayer->quakeEffect-kTicsPerFrame, 0);
+    pPlayer->tiltEffect = ClipLow(pPlayer->tiltEffect-kTicsPerFrame, 0);
+    pPlayer->visibility = ClipLow(pPlayer->visibility-kTicsPerFrame, 0);
+    pPlayer->painEffect = ClipLow(pPlayer->painEffect-kTicsPerFrame, 0);
+    pPlayer->blindEffect = ClipLow(pPlayer->blindEffect-kTicsPerFrame, 0);
+    pPlayer->pickupEffect = ClipLow(pPlayer->pickupEffect-kTicsPerFrame, 0);
     if (pPlayer == gMe && gMe->pXSprite->health == 0)
         pPlayer->hand = 0;
     if (!pXSprite->health)
@@ -2379,10 +2389,10 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
             sndStartSample(nSound, 255, 2, 0);
     }
     int nPal1 = 0, nPal2 = 0;
-    if (!VanillaMode()) // tint names within message string
+    if (gColorMsg && !VanillaMode()) // tint names within message string
     {
-        nPal1 = gColorMsg ? playerColorPalMessage(pKiller->teamId) : 0;
-        nPal2 = gColorMsg ? playerColorPalMessage(pVictim->teamId) : 0;
+        nPal1 = playerColorPalMessage(pKiller->teamId);
+        nPal2 = playerColorPalMessage(pVictim->teamId);
     }
     if ((buffer[0] != '\0') || VanillaMode())
         viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal1, nPal2);
@@ -2483,7 +2493,10 @@ void playerProcessRoundCheck(void)
     int nPal = 0;
     if (nWinners > 1) // if there is more than one winner, count as tie
     {
-        sprintf(buffer, "It's a tie of %d! Ending round...", nWinners);
+        if (gGameOptions.nGameType == kGameTypeTeams)
+            sprintf(buffer, "Both teams tied score! Ending round...");
+        else
+            sprintf(buffer, "It's a tie of %d! Ending round...", nWinners);
     }
     else if (gGameOptions.nGameType == kGameTypeBloodBath)
     {
@@ -2649,7 +2662,9 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
         {
             DAMAGEINFO *pDamageInfo = &damageInfo[nDamageType];
             int nSound;
-            if (nDamage >= (10<<4))
+            if ((gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly) && gProfile[pPlayer->nPlayer].nModel && !VanillaMode()) // use cultist hurt and burn sounds
+                nSound = (nDamageType == kDamageBurn ? 1031 : 1013) + Random(2);
+            else if (nDamage >= (10<<4))
                 nSound = pDamageInfo->at4[0];
             else
                 nSound = pDamageInfo->at4[Random(3)];

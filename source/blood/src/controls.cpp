@@ -324,8 +324,8 @@ void ctrlGetInput(void)
         {
             if (gCrouchToggleState == 0)
                 gCrouchToggleState = 1;
-            else if (gCrouchToggleState == 2)
-                gCrouchToggleState = 3;
+            else if (gCrouchToggleState == 2) // stop crouching
+                gCrouchToggleState = 3, gInput.buttonFlags.crouch = 0;
         }
     }
     else if (gCrouchToggle && (gCrouchToggleState > 0) && (gCrouchToggleState < 3) && gMe && !gMe->isUnderwater)
@@ -533,6 +533,11 @@ void ctrlGetInput(void)
     {
         input.strafe -= info.dx>>1;
         input.forward -= info.dz>>1;
+        if (!run) // when autorun is off/run is not held, reduce overall speed for controller
+        {
+            input.strafe = clamp(input.strafe, -256, 256);
+            input.forward = clamp(input.forward, -256, 256);
+        }
         if (info.mousey == 0)
         {
             if (gMouseAim)

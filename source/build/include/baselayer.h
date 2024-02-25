@@ -62,7 +62,7 @@ extern int32_t r_usenewaspect, newaspect_enable;
 extern int32_t r_fpgrouscan;
 extern int32_t setaspect_new_use_dimen;
 extern uint32_t r_screenxy;
-extern int32_t r_mirrormode;
+extern int32_t r_mirrormode, r_mirrormodelock;
 extern int32_t xres, yres, bpp, fullscreen, bytesperline;
 extern double refreshfreq;
 extern intptr_t frameplace;
@@ -292,7 +292,13 @@ extern void (*keypresscallback)(int32_t,int32_t);
 extern void (*g_mouseCallback)(int32_t,int32_t);
 extern void (*g_controllerHotplugCallback)(void);
 extern void (*g_fileDropCallback)(const char*);
-extern char g_controllerSupportDisabled;
+extern char g_controllerSupportFlags;
+enum
+{
+    CONTROLLER_DISABLED  = 1,
+    CONTROLLER_NO_DINPUT = 2,
+    CONTROLLER_NO_XINPUT = 4
+};
 int32_t initinput(void(*hotplugCallback)(void) = NULL);
 void uninitinput(void);
 void keySetCallback(void (*callback)(int32_t,int32_t));

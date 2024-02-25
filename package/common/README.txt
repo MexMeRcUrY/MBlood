@@ -1,5 +1,5 @@
 ### NotBlood
-A gameplay modification of Blood, based upon the EDuke32 driven Blood reverse-engineer port NBlood
+An fork of NBlood with gameplay options, optional mutators and expanded multiplayer features
 
 ### Features
 * Switch to last active weapon if TNT/spray can is active when entering water
@@ -114,6 +114,7 @@ It should be noted that vanilla mode does not work with modern maps
    - Limit impulse damage when shooting enemies downward at point-blank
    - Cheogh blasting/attacking can now hit prone players (only for well done and above difficulties)
    - Fix Beast state when leaving water sector
+   - Restore unused fall animations for cultists
 * Random cultist TNT
    - This will make cultists use a variety of random thrown sprites such as:
    - Napalm balls, proxy bundles, armed spray cans or pod projectiles
@@ -121,8 +122,10 @@ It should be noted that vanilla mode does not work with modern maps
    - Select between original weapon behavior, NBlood's V1.X behavior or NotBlood's tweaked weapon set which include:
    - Tommy gun alt fire uses autoaim
    - Autoaim is always enabled for pitchfork
+   - Make beast vision see through nearby walls
    - Adjust pitch offset for spray/missile firing
    - Adds a charge up stab for pitchfork's alt fire
+   - Lifeleech steals enemy's health (like V1.X behavior)
    - Makes lifeleech throwable and increases damage while in sentry mode
    - Do double melee damage if attacking enemies from 45 degrees behind
    - Allows tesla projectiles to be reflected back with reflective shots powerup
@@ -162,6 +165,8 @@ It should be noted that vanilla mode does not work with modern maps
 * QSKFA - Toggle blood alpha alt fire missile for pitchfork
 * SONIC - Toggle fast player movement
 * NO U - Activates reflect shots power-up
+* JAMES HARDIE - Activates asbestos armor power-up
+* VULOVIC - Activates feather fall power-up
 
 ### Randomizer seed cheats
 * AAAAAAAA - Phantoms only
@@ -191,6 +196,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable multiplayer chat message beep
 * cl_dim
    - Enable/disable dimming background when menu is active
+* cl_interpolatemethod
+   - Set view interpolation method (0: original [integer], 1: notblood [floating-point])"
 * cl_interpolatepanning
    - Enable/disable sector texture panning interpolation (cl_interpolate must be set on)
 * cl_interpolateweapon
@@ -205,8 +212,6 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable random obituary kill messages
 * cl_multikill
    - Enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)
-* cl_stompkill
-   - Enable/disable sound effect when stomp killing another player. The sound can be changed by replacing the 'notblood.pk3/NOTSTOMP.RAW' file
 * cl_weaponhbob
    - Enable/disable view horizontal bobbing
 * cl_rollangle
@@ -229,6 +234,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable fast weapon switching
 * cl_packitemswitch
    - Enable/disable item slot switching to activated item (always enabled in multiplayer)
+* color
+   - Set preferred player color palette in multiplayer (0: none, 1: blue, 2: red, 3: teal, 4: gray)
 * crosshair
    - Enable/disable crosshair (0: off, 1: on, 2: on [autoaim])
 * detail

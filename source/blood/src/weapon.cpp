@@ -204,7 +204,7 @@ char checkAmmo2(PLAYER *pPlayer, int ammotype, int amount)
 
 void SpawnBulletEject(PLAYER *pPlayer, int a2, int a3)
 {
-    if ((r_mirrormode & 1) && (numplayers == 1) && !VanillaMode(true)) // mirror mode enabled, invert position for bullet ejection
+    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert position for bullet ejection
         a2 = -a2, a3 = -a3;
     POSTURE *pPosture = &pPlayer->pPosture[pPlayer->lifeMode][pPlayer->posture];
     pPlayer->zView = pPlayer->pSprite->z-pPosture->eyeAboveZ;
@@ -220,7 +220,7 @@ void SpawnBulletEject(PLAYER *pPlayer, int a2, int a3)
 
 void SpawnShellEject(PLAYER *pPlayer, int a2, int a3)
 {
-    if ((r_mirrormode & 1) && (numplayers == 1) && !VanillaMode(true)) // mirror mode enabled, invert position for shell ejection
+    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert position for shell ejection
         a2 = -a2, a3 = -a3;
     POSTURE *pPosture = &pPlayer->pPosture[pPlayer->lifeMode][pPlayer->posture];
     pPlayer->zView = pPlayer->pSprite->z-pPosture->eyeAboveZ;
@@ -306,7 +306,7 @@ void WeaponPlay(PLAYER *pPlayer)
     QAV *pQAV = weaponQAV[pPlayer->weaponQav];
     pQAV->nSprite = pPlayer->pSprite->index;
     int nTicks = pQAV->at10 - pPlayer->weaponTimer;
-    pQAV->Play(nTicks-4, nTicks, pPlayer->qavCallback, pPlayer);
+    pQAV->Play(nTicks-kTicsPerFrame, nTicks, pPlayer->qavCallback, pPlayer);
 }
 
 void StartQAV(PLAYER *pPlayer, int nWeaponQAV, int a3 = -1, char a4 = 0)
@@ -318,7 +318,7 @@ void StartQAV(PLAYER *pPlayer, int nWeaponQAV, int a3 = -1, char a4 = 0)
     pPlayer->qavLoop = a4;
     weaponQAV[nWeaponQAV]->Preload();
     WeaponPlay(pPlayer);
-    pPlayer->weaponTimer -= 4;
+    pPlayer->weaponTimer -= kTicsPerFrame;
 }
 
 struct WEAPONTRACK
@@ -551,7 +551,7 @@ void WeaponRaise(PLAYER *pPlayer)
     case kWeaponTNT:
         if (gInfiniteAmmo || checkAmmo2(pPlayer, 5, 1))
         {
-            if ((pPlayer->weaponState == 2) && !prevWeapon && !VanillaMode()) // if quickly switching from tnt to spray can and back, don't put away lighter
+            if ((pPlayer->weaponState == 2) && (prevWeapon == kWeaponNone) && !VanillaMode()) // if quickly switching from tnt to spray can and back, don't put away lighter
                 prevWeapon = kWeaponSprayCan;
             pPlayer->weaponState = 3;
             if (prevWeapon == kWeaponSprayCan)
@@ -652,7 +652,7 @@ void WeaponRaise(PLAYER *pPlayer)
             StartQAV(pPlayer, 74, -1, 0);
         }
         break;
-    case kWeaponNapalm: // napalm
+    case kWeaponNapalm:
         if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()))
         {
             StartQAV(pPlayer, 120, -1, 0);
@@ -811,7 +811,7 @@ void WeaponLower(PLAYER *pPlayer)
         }
         break;
     case kWeaponShotgun:
-        if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()))
+        if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()) && (VanillaMode() || (gInfiniteAmmo || CheckAmmo(pPlayer, 2, 4))))
             StartQAV(pPlayer, 63, -1, 0);
         else
             StartQAV(pPlayer, 58, -1, 0);
@@ -838,7 +838,7 @@ void WeaponLower(PLAYER *pPlayer)
             StartQAV(pPlayer, 81, -1, 0);
         break;
     case kWeaponNapalm:
-        if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()))
+        if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()) && (VanillaMode() || (gInfiniteAmmo || CheckAmmo(pPlayer, 4, 2))))
             StartQAV(pPlayer, 124, -1, 0);
         else
             StartQAV(pPlayer, 92, -1, 0);
@@ -1051,7 +1051,7 @@ void WeaponUpdateState(PLAYER *pPlayer)
         switch (vb)
         {
         case 3:
-            if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()) && (gInfiniteAmmo || CheckAmmo(pPlayer,4, 4)))
+            if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()) && (gInfiniteAmmo || CheckAmmo(pPlayer, 4, VanillaMode() ? 4 : 2)))
                 pPlayer->weaponQav = 121;
             else
                 pPlayer->weaponQav = 90;
@@ -1439,7 +1439,7 @@ void AltFireSpread2(int nTrigger, PLAYER *pPlayer)
     dassert(nTrigger > 0 && nTrigger <= kMaxSpread);
     Aim *aim = &pPlayer->aim;
     int angle;
-    if ((r_mirrormode & 1) && (numplayers == 1) && !VanillaMode(true)) // mirror mode enabled, invert tommy gun spread (only for single-player)
+    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert tommy gun spread (only for single-player)
         angle = (getangle(aim->dx, aim->dy)-((112*(nTrigger-1))/14-56))&2047;
     else
         angle = (getangle(aim->dx, aim->dy)+((112*(nTrigger-1))/14-56))&2047;
@@ -2338,7 +2338,7 @@ void WeaponProcess(PLAYER *pPlayer) {
     }
     WeaponPlay(pPlayer);
     UpdateAimVector(pPlayer);
-    pPlayer->weaponTimer -= 4;
+    pPlayer->weaponTimer -= kTicsPerFrame;
     char bShoot = pPlayer->input.buttonFlags.shoot;
     char bShoot2 = pPlayer->input.buttonFlags.shoot2;
     if (pPlayer->qavLoop && pPlayer->pXSprite->health > 0)
@@ -2582,16 +2582,16 @@ void WeaponProcess(PLAYER *pPlayer) {
                 return;
             }
         }
-        if (pPlayer->pXSprite->health == 0 || pPlayer->hasWeapon[pPlayer->input.newWeapon] == 0)
+        if ((pPlayer->pXSprite->health > 0) && !pPlayer->hasWeapon[pPlayer->input.newWeapon] && !pPlayer->curWeapon && !VanillaMode()) // if trying to switch to missing/out of ammo weapon, switch to loaded weapon instead of holstering
         {
-            if ((pPlayer->hasWeapon[pPlayer->input.newWeapon] == 0) && !pPlayer->curWeapon && !VanillaMode()) // if trying to switch to missing/out of ammo weapon, switch to loaded weapon instead of holstering
-            {
-                int t;
-                char weapon = WeaponFindLoaded(pPlayer, &t);
-                pPlayer->weaponMode[weapon] = t;
-                pPlayer->input.newWeapon = weapon;
-                return;
-            }
+            int t;
+            char weapon = WeaponFindLoaded(pPlayer, &t);
+            pPlayer->weaponMode[weapon] = t;
+            pPlayer->input.newWeapon = weapon;
+            return;
+        }
+        if (pPlayer->pXSprite->health == 0 || !pPlayer->hasWeapon[pPlayer->input.newWeapon])
+        {
             pPlayer->input.newWeapon = kWeaponNone;
             return;
         }
@@ -2781,7 +2781,7 @@ void WeaponProcess(PLAYER *pPlayer) {
             }
             break;
         case kWeaponNapalm:
-            if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()))
+            if (powerupCheck(pPlayer, kPwUpTwoGuns) && (!gGameOptions.bQuadDamagePowerup || VanillaMode()) && (VanillaMode() || (gInfiniteAmmo || CheckAmmo(pPlayer, 4, 2))))
                 StartQAV(pPlayer, 122, nClientFireNapalm, 0);
             else
                 StartQAV(pPlayer, 91, nClientFireNapalm, 0);

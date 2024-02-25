@@ -890,11 +890,6 @@ static int osdcmd_cvar_set_game(osdcmdptr_t parm)
 
         ud.player_skill = ud.m_player_skill;
     }
-    else if (!Bstrcasecmp(parm->name, "color"))
-    {
-        ud.color = G_CheckPlayerColor(ud.color);
-        g_player[0].ps->palookup = g_player[0].pcolor = ud.color;
-    }
     else if (!Bstrcasecmp(parm->name, "osdscale"))
     {
         osdrscale = 1.f/osdscale;
@@ -997,6 +992,7 @@ int32_t registerosdcommands(void)
         { "cl_calebtalk", "enable/disable Caleb's dialog lines (0: on, 1: no idle, 2: no explosion/gib, 3: off)", (void *)&gCalebTalk, CVAR_INT, 0, 3 },
         { "cl_chatsnd", "enable/disable multiplayer chat message beep", (void *)&gChatSnd, CVAR_BOOL, 0, 1 },
         { "cl_interpolate", "enable/disable view interpolation", (void *)&gViewInterpolate, CVAR_BOOL, 0, 1 },
+        { "cl_interpolatemethod", "set view interpolation method (0: original [integer], 1: notblood [floating-point])", (void *)&gViewInterpolateMethod, CVAR_BOOL, 0, 1 },
         { "cl_interpolatepanning", "enable/disable sector texture panning interpolation (cl_interpolate must be set on)", (void *)&gPanningInterpolate, CVAR_BOOL, 0, 1 },
         { "cl_interpolateweapon", "enable/disable view interpolation for drawn weapon (0: disable, 1: position, 2: position/qav animation)", (void *)&gWeaponInterpolate, CVAR_INT, 0, 2 },
         { "cl_colormsg", "enable/disable colored player names in messages", (void *)&gColorMsg, CVAR_BOOL, 0, 1 },
@@ -1005,7 +1001,6 @@ int32_t registerosdcommands(void)
         { "cl_killmsg", "enable/disable kill messages", (void *)&gKillMsg, CVAR_BOOL, 0, 1 },
         { "cl_killobituaries", "enable/disable random obituary kill messages", (void *)&gKillObituary, CVAR_BOOL, 0, 1 },
         { "cl_multikill", "enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)", (void *)&gMultiKill, CVAR_INT, 0, 2 },
-        { "cl_stompkill", "enable/disable sound effect when stomp killing another player. the sound can be changed by replacing the 'notblood.pk3/NOTSTOMP.RAW' file", (void *)&gStompSound, CVAR_BOOL, 0, 1 },
         { "cl_viewhbob", "enable/disable view horizontal bobbing", (void *)&gViewHBobbing, CVAR_BOOL, 0, 1 },
         { "cl_viewvbob", "enable/disable view vertical bobbing", (void *)&gViewVBobbing, CVAR_BOOL, 0, 1 },
         { "cl_weaponhbob", "enable/disable weapon horizontal bobbing (0: off, 1: original, 2: V1.0x)", (void *)&gWeaponHBobbing, CVAR_INT|CVAR_MULTI, 0, 2 },
@@ -1037,6 +1032,7 @@ int32_t registerosdcommands(void)
         { "cl_weaponswitch", "enable/disable auto weapon switching", (void *)&gWeaponSwitch, CVAR_INT|CVAR_MULTI, 0, 3 },
         { "cl_weaponfastswitch", "enable/disable fast weapon switching", (void *)&gWeaponFastSwitch, CVAR_BOOL|CVAR_MULTI, 0, 1 },
         { "cl_packitemswitch", "enable/disable item slot switching to activated item (always enabled in multiplayer)", (void *)&gPackSlotSwitch, CVAR_BOOL, 0, 1 },
+        { "color", "set preferred player color palette in multiplayer (0: none, 1: blue, 2: red, 3: teal, 4: gray)", (void *)&gPlayerColorPreference, CVAR_INT, 0, 4 },
 //
 //        { "color", "changes player palette", (void *)&ud.color, CVAR_INT|CVAR_MULTI, 0, MAXPALOOKUPS-1 },
 //
@@ -1100,9 +1096,9 @@ int32_t registerosdcommands(void)
         { "in_rumble","enables rumble for joystick if it is present",(void *)&gSetup.joystickrumble, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
         { "in_mouse","enables input from the mouse if it is present",(void *)&gSetup.usemouse, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
 
-        { "in_aimmode", "0:toggle, 1:hold to aim", (void *)&gMouseAiming, CVAR_BOOL, 0, 1 },
+        { "in_aimmode", "0: toggle, 1: hold to aim", (void *)&gMouseAiming, CVAR_BOOL, 0, 1 },
         { "in_centerviewondrop", "enable/disable recenter view when dropping down onto ground", (void *)&gCenterViewOnDrop, CVAR_BOOL, 0, 1 },
-        { "in_crouchmode", "toggles crouch button (0:hold, 1:toggle)", (void *)&gCrouchToggle, CVAR_BOOL, 0, 1 },
+        { "in_crouchmode", "toggles crouch button (0: hold, 1: toggle)", (void *)&gCrouchToggle, CVAR_BOOL, 0, 1 },
         {
             "in_mousebias", "emulates the original mouse code's weighting of input towards whichever axis is moving the most at any given time",
             (void *)&MouseBias, CVAR_INT, 0, 32
@@ -1114,6 +1110,7 @@ int32_t registerosdcommands(void)
         { "in_turnacceleration", "set keyboard turning acceleration (0: off, 1: only when running, 2: always on)", (void *)&gTurnAcceleration, CVAR_INT, 0, 2 },
 
 //
+        { "model", "set player model for multiplayer (0: caleb, 1: cultist)", (void *)&gPlayerModel, CVAR_BOOL, 0, 1 },
         { "mus_enabled", "enables/disables music", (void *)&MusicToggle, CVAR_BOOL, 0, 1 },
         { "mus_restartonload", "restart the music when loading a saved game with the same map or not", (void *)&MusicRestartsOnLoadToggle, CVAR_BOOL, 0, 1 },
         { "mus_volume", "controls music volume", (void *)&MusicVolume, CVAR_INT, 0, 255 },

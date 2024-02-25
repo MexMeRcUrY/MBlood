@@ -600,7 +600,7 @@ void fakePlayerProcess(PLAYER *pPlayer, GINPUT *pInput)
 
     predict.at34 = predict.at40 - predict.at38 - (12<<8);
 
-    predict.at0 = ClipLow(predict.at0-4, 0);
+    predict.at0 = ClipLow(predict.at0-kTicsPerFrame, 0);
 
     nSpeed >>= 16;
     if (predict.at48 == 1)
@@ -1673,23 +1673,27 @@ void viewDrawMapTitle(void)
 
 void viewDrawAimedPlayerName(void)
 {
-    if (!gShowPlayerNames || (gView->aim.dx == 0 && gView->aim.dy == 0) || (gGameOptions.nGameType == kGameTypeSinglePlayer))
+    if (!gShowPlayerNames || (gGameOptions.nGameType == kGameTypeSinglePlayer) || !gView->pSprite)
         return;
+    const int nX = gAimReticle == 2 ? gView->aim.dx : Cos(gView->pSprite->ang)>>16;
+    const int nY = gAimReticle == 2 ? gView->aim.dy : Sin(gView->pSprite->ang)>>16;
+    if (nX == 0 && nY == 0)
+        return;
+    const int nZ = gAimReticle == 2 ? gView->aim.dz : gView->slope;
 
     const int nDist = (gGameOptions.nGameType == kGameTypeCoop) ? 640 : 512; // set hitscan distance to 20/16 meters for co-op mode
-    const int hit = HitScan(gView->pSprite, gView->zView, gView->aim.dx, gView->aim.dy, gView->aim.dz, CLIPMASK0, nDist);
+    const int hit = HitScan(gView->pSprite, gView->zView, nX, nY, nZ, CLIPMASK0, nDist);
     if (hit == 3)
     {
         spritetype* pSprite = &sprite[gHitInfo.hitsprite];
-        if (IsPlayerSprite(pSprite))
-        {
-            char nPlayer = pSprite->type-kDudePlayer1;
-            if (!VanillaMode() && powerupCheck(&gPlayer[nPlayer], kPwUpDoppleganger) && !IsTargetTeammate(gView, gPlayer[nPlayer].pSprite)) // if doppleganger powerup is active, set player id as viewer
-                nPlayer = gView->pSprite->type-kDudePlayer1;
-            char* szName = gProfile[nPlayer].name;
-            int nPalette = !VanillaMode() ? playerColorPalAimName(gPlayer[nPlayer].teamId) : playerColorPalDefault(gPlayer[nPlayer].teamId);
-            viewDrawText(4, szName, 160, 125, -128, nPalette, 1, 1);
-        }
+        if (!IsPlayerSprite(pSprite))
+            return;
+        char nPlayer = pSprite->type-kDudePlayer1;
+        if (powerupCheck(&gPlayer[nPlayer], kPwUpDoppleganger) && !IsTargetTeammate(gView, gPlayer[nPlayer].pSprite)) // if doppleganger powerup is active, set player id as viewer
+            nPlayer = gView->pSprite->type-kDudePlayer1;
+        char* szName = gProfile[nPlayer].name;
+        int nPalette = !VanillaMode() ? playerColorPalAimName(gPlayer[nPlayer].teamId) : playerColorPalDefault(gPlayer[nPlayer].teamId);
+        viewDrawText(4, szName, 160, 125, -128, nPalette, 1, 1);
     }
 }
 
@@ -3154,6 +3158,92 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
     return NULL;
 }
 
+inline char viewApplyPlayerModel(int *nTile)
+{
+    switch (*nTile)
+    {
+        // 3150-6 DESPAWN
+        case 3150: *nTile = 2583; break;
+        case 3151: *nTile = 2584; break;
+        case 3152: *nTile = 2585; break;
+        case 3153: *nTile = 2587; break;
+        case 3154: *nTile = 2589; break;
+        case 3155: *nTile = 2590; break;
+        case 3156: *nTile = 2591; break;
+        // 3840 L IMPACT
+        case 3840: *nTile = 2865; break;
+        // 3845 L LIFT
+        case 3845: *nTile = 2870; break;
+        // 3850 MID
+        case 3850: *nTile = 2875; break;
+        // 3855 R IMPACT
+        case 3855: *nTile = 2880; break;
+        // 3860 R LIFT
+        case 3860: *nTile = 2885; break;
+        // 3865 MID
+        case 3865: *nTile = 2860; break;
+        // 3870 STAND
+        case 3870: *nTile = 2825; break;
+        // 3875 LEANED
+        case 3875: *nTile = 2925; break;
+        // 3880-4 SHOT AND FALL
+        case 3880: *nTile = 2930; break;
+        case 3881: *nTile = 2931; break;
+        case 3882: *nTile = 2932; break;
+        case 3883: *nTile = 2933; break;
+        case 3884: *nTile = 2934; break;
+        // 3885-6 DEAD FLAT
+        case 3885: *nTile = 2935; break;
+        case 3886: *nTile = 2936; break;
+        // 3887 SWIM L IMPACT
+        case 3887: *nTile = 3241; break;
+        // 3892 SWIM L LIFT
+        case 3892: *nTile = 3241; break;
+        // 3897 MID
+        case 3897: *nTile = 3246; break;
+        // 3902 SWIM R IMPACT
+        case 3902: *nTile = 3246; break;
+        // 3907 SWIM R LIFT
+        case 3907: *nTile = 3251; break;
+        // 3912 SWIM MID
+        case 3912: *nTile = 3256; break;
+        // 3917 PRONE R1
+        case 3917: *nTile = 3375; break;
+        // 3922 PRONE R2
+        case 3922: *nTile = 3380; break;
+        // 3927 PRONE L1
+        case 3927: *nTile = 3385; break;
+        // 3932 PRONE L2
+        case 3932: *nTile = 3390; break;
+        // 3937-48 FINISH HIM DEATH SEQ
+        case 3937: *nTile = 2930; break;
+        case 3938: *nTile = 2931; break;
+        case 3939: *nTile = 2932; break;
+        case 3940: *nTile = 2932; break;
+        case 3941: *nTile = 2932; break;
+        case 3942: *nTile = 2933; break;
+        case 3943: *nTile = 2933; break;
+        case 3944: *nTile = 2933; break;
+        case 3945: *nTile = 2934; break;
+        case 3946: *nTile = 2935; break;
+        case 3947: *nTile = 2936; break;
+        case 3948: *nTile = 2937; break;
+        // 3949-53 FINISH HIM HEADLESS SEQ
+        case 3949: *nTile = 2933; break;
+        case 3950: *nTile = 2934; break;
+        case 3951: *nTile = 2935; break;
+        case 3952: *nTile = 2936; break;
+        case 3953: *nTile = 2937; break;
+        // 3959 UNUSED JUMP
+        case 3959: *nTile = 2895; break;
+        // 3964-65 FINISH HIM KNEEL LOOP
+        case 3964: *nTile = 2932; break;
+        case 3965: *nTile = 2933; break;
+        default: return 0;
+    }
+    return 1;
+}
+
 LOCATION gPrevSpriteLoc[kMaxSprites];
 
 static void viewApplyDefaultPal(tspritetype *pTSprite, sectortype const *pSector)
@@ -3203,6 +3293,33 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             pTSprite->y = interpolate(pPrevLoc->y, pTSprite->y, gInterpolate);
             pTSprite->z = interpolate(pPrevLoc->z, pTSprite->z, gInterpolate);
             pTSprite->ang = pPrevLoc->ang+mulscale16(((pTSprite->ang-pPrevLoc->ang+1024)&2047)-1024, gInterpolate);
+        }
+        if (!VanillaMode() && ((pTSprite->statnum == kStatDude) || (pTSprite->type == kThingVoodooHead)))
+        {
+            char bReplacedPlayerTile = 0;
+            while ((gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly)) // replace player caleb sprite with cultist sprite
+            {
+                if (!(IsPlayerSprite(pTSprite) && gProfile[pTSprite->type-kDudePlayer1].nModel) && !(pTSprite->type == kThingVoodooHead && sprite[nSprite].inittype >= kDudePlayer1 && sprite[nSprite].inittype <= kDudePlayer8)) // if profile uses caleb, don't replace sprite
+                    break;
+                bReplacedPlayerTile = viewApplyPlayerModel(&nTile);
+                if (bReplacedPlayerTile) // set TSprite picnum and adjust tile to floor
+                {
+                    if (gSpriteHit[nXSprite].florhit) // only do this if player is standing on ground
+                    {
+                        int topnew, topold, bottomnew, bottomold;
+                        GetSpriteExtents(pTSprite, &topold, &bottomold);
+                        pTSprite->picnum = nTile;
+                        GetSpriteExtents(pTSprite, &topnew, &bottomnew);
+                        if (bottomnew != bottomold) // align bottom of new tile to old tile
+                            pTSprite->z -= bottomnew - bottomold;
+                    }
+                    else
+                        pTSprite->picnum = nTile;
+                }
+                break;
+            }
+            if ((EnemiesNotBlood() || bReplacedPlayerTile) && !gSpriteHit[nXSprite].florhit && (zvel[nSprite] > 250000) && ((nTile == 2825) || (nTile >= 2860 && nTile <= 2885)) && (bReplacedPlayerTile || (pTSprite->type == kDudeCultistTommy) || (pTSprite->type == kDudeCultistShotgun) || (pTSprite->type == kDudeCultistTommyProne) || (pTSprite->type == kDudeCultistShotgunProne) || (pTSprite->type == kDudeCultistTesla) || (pTSprite->type == kDudeCultistTNT) || (pTSprite->type == kDudeCultistBeast))) // replace tile with unused jump tile for falling cultists
+                nTile = pTSprite->picnum = (zvel[nSprite] <= 500000) ? 2890 : ((zvel[nSprite] <= 750000) ? 2895 : 2900);
         }
         int nAnim = 0;
         switch (picanm[nTile].extra & 7) {
@@ -3542,7 +3659,27 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             
 
             if (pXSector && pXSector->color) pTSprite->pal = pSector->floorpal;
-            if (powerupCheck(gView, kPwUpBeastVision) > 0) pTSprite->shade = -128;
+            if (powerupCheck(gView, kPwUpBeastVision) > 0)
+            {
+                pTSprite->shade = -128;
+                while (WeaponsNotBlood() && !VanillaMode() && (nSprite != gView->pSprite->index) && gKillMgr.AllowedType(&sprite[nSprite]) && !cansee(cX, cY, cZ, gView->pSprite->sectnum, pTSprite->x, pTSprite->y, pTSprite->z, pTSprite->sectnum)) // janky x-ray vision
+                {
+                    auto pNSprite = viewInsertTSprite(gView->pSprite->sectnum, 32767, pTSprite);
+                    if (!pNSprite)
+                        break;
+                    pNSprite->ang = pTSprite->ang;
+                    pNSprite->shade = -64;
+                    pNSprite->pal = pTSprite->pal;
+                    pNSprite->cstat = pTSprite->cstat;
+                    pNSprite->cstat |= 2;
+                    pNSprite->picnum = pTSprite->picnum;
+                    pNSprite->x = interpolate(pTSprite->x, cX, 65536-(65536/0x30));
+                    pNSprite->y = interpolate(pTSprite->y, cY, 65536-(65536/0x30));
+                    pNSprite->z = interpolate(pTSprite->z, cZ, 65536-(65536/0x30));
+                    pNSprite->xrepeat = pNSprite->yrepeat = 1;
+                    break;
+                }
+            }
 
             if (IsPlayerSprite(pTSprite)) {
                 viewApplyDefaultPal(pTSprite, pSector);
@@ -3565,8 +3702,8 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                     viewAddEffect(nTSprite, kViewEffectReflectiveBall);
                 }
                 
-                if (gShowWeapon && (gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsAlways) && gView) {
-                    const char bDrawDudeWeap = (powerupCheck(pPlayer, kPwUpShadowCloak) && !(gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsCloak)) || bIsTeammateOrDoppleganger || (pPlayer == gView && gViewPos == VIEWPOS_1); // don't draw enemy weapon if they are cloaked
+                if (gShowWeapon && (gGameOptions.nGameType != kGameTypeSinglePlayer) && gView && ((pPlayer == gView && gViewPos == VIEWPOS_1) || !(gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsAlways))) {
+                    const char bDrawDudeWeap = !(powerupCheck(pPlayer, kPwUpShadowCloak) && (gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsCloak)) || bIsTeammateOrDoppleganger || (pPlayer == gView && gViewPos == VIEWPOS_1); // don't draw enemy weapon if they are cloaked
                     if (!VanillaMode() ? bDrawDudeWeap : (pPlayer != gView))
                         viewAddEffect(nTSprite, kViewEffectShowWeapon);
                 }
@@ -3657,6 +3794,23 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             if (pTSprite->type < kThingBase || pTSprite->type >= kThingMax || !gSpriteHit[nXSprite].florhit) {
                 if ((pTSprite->flags & kPhysMove) && getflorzofslope(pTSprite->sectnum, pTSprite->x, pTSprite->y) >= cZ)
                     viewAddEffect(nTSprite, kViewEffectShadow);
+            }
+            const char bArmedBomb = (pTSprite->type == kThingArmedTNTStick) || (pTSprite->type == kThingArmedTNTBundle) || (pTSprite->type == kThingArmedProxBomb) || (pTSprite->type == kThingArmedRemoteBomb);
+            if ((powerupCheck(gView, kPwUpBeastVision) > 0) && WeaponsNotBlood() && !VanillaMode() && bArmedBomb && !cansee(cX, cY, cZ, gView->pSprite->sectnum, pTSprite->x, pTSprite->y, pTSprite->z, pTSprite->sectnum)) // janky x-ray vision
+            {
+                auto pNSprite = viewInsertTSprite(gView->pSprite->sectnum, 32767, pTSprite);
+                if (!pNSprite)
+                    break;
+                pNSprite->ang = pTSprite->ang;
+                pNSprite->shade = -64;
+                pNSprite->pal = pTSprite->pal;
+                pNSprite->cstat = pTSprite->cstat;
+                pNSprite->cstat |= 2;
+                pNSprite->picnum = pTSprite->picnum;
+                pNSprite->x = interpolate(pTSprite->x, cX, 65536-(65536/0x30));
+                pNSprite->y = interpolate(pTSprite->y, cY, 65536-(65536/0x30));
+                pNSprite->z = interpolate(pTSprite->z, cZ, 65536-(65536/0x30));
+                pNSprite->xrepeat = pNSprite->yrepeat = 1;
             }
         }
         break;
@@ -4214,7 +4368,7 @@ void viewDrawScreen(void)
     lastUpdate = totalclock;
     if (!viewPaused())
     {
-        gInterpolate = ((totalclock-gNetFifoClock)+4).toScale16()/4;
+        gInterpolate = ((totalclock-gNetFifoClock)+kTicsPerFrame).toScale16()/kTicsPerFrame;
     }
     if (gInterpolate < 0 || gInterpolate > 65536)
     {
@@ -4319,7 +4473,7 @@ void viewDrawScreen(void)
             q16horiz += interpolate(fix16_from_int(mulscale30(0x40000000-Cos((gView->tiltEffect+4)<<2), 30)), q16tilt, gInterpolate);
         else
             q16horiz += q16tilt;
-        if (gViewPos == 0)
+        if (gViewPos == VIEWPOS_0)
         {
             if (gViewHBobbing)
             {
@@ -4602,7 +4756,7 @@ RORHACK:
         fix16_t deliriumPitchI = gViewInterpolate ? interpolate(fix16_from_int(deliriumPitchO), fix16_from_int(deliriumPitch), gInterpolate) : fix16_from_int(deliriumPitch);
         DrawMirrors(cX, cY, cZ, cA, q16horiz + fix16_from_int(defaultHoriz) + deliriumPitchI, gInterpolate, bLink && !VanillaMode() ? gViewIndex : -1); // only hide self sprite while traversing between sector
         int bakCstat = gView->pSprite->cstat;
-        if (gViewPos == 0) // don't render self while in first person view
+        if (gViewPos == VIEWPOS_0) // don't render self while in first person view
         {
             gView->pSprite->cstat |= CSTAT_SPRITE_INVISIBLE;
         }
@@ -4739,7 +4893,7 @@ RORHACK:
             }
         }
 #endif
-        if (gViewPos == 0)
+        if (gViewPos == VIEWPOS_0)
         {
             if (gAimReticle)
                 viewAimReticle(gView, defaultHoriz, q16slopehoriz, fFov);
@@ -4781,7 +4935,7 @@ RORHACK:
            
 
         }
-        if (gViewPos == 0 && gView->pXSprite->burnTime > 60)
+        if (gViewPos == VIEWPOS_0 && gView->pXSprite->burnTime > 60)
         {
             viewBurnTime(gView->pXSprite->burnTime);
         }

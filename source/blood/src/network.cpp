@@ -71,9 +71,9 @@ NETWORKMODE gNetMode = NETWORK_NONE;
 char gNetAddress[32];
 // PORT-TODO: Use different port?
 int gNetPort = kNetDefaultPort;
-int gNetPortLocal = kNetDefaultPort;
+int gNetPortLocal = -1;
 
-const short kNetVersion = 0x229;
+const short kNetVersion = 0x22A;
 
 PKT_STARTGAME gPacketStartGame;
 
@@ -175,6 +175,8 @@ void netResetToSinglePlayer(void)
     gGameMenuMgr.Deactivate();
     gNetNotifyProfileUpdate = false;
     gPlayerRoundEnding = 0;
+    r_mirrormodelock = 0;
+    SetMirrorMode(NULL); // restore single-player setting for mirror mode
 }
 
 void netSendPacket(int nDest, char *pBuffer, int nSize)
@@ -498,10 +500,10 @@ void netGetPackets(void)
                 if (gPlayer[nPlayer].pXSprite && (gPlayer[nPlayer].pXSprite->health == 0) && !VanillaMode()) // if player is dead, don't play taunt
                     break;
                 int nTaunt = GetPacketByte(pPacket);
-                if (gPlayer[nPlayer].pSprite && (nTaunt >= 10) && !VanillaMode()) // fart
+                if (gPlayer[nPlayer].pSprite && (nTaunt >= 10) && !VanillaMode()) // cultist talk
                 {
-                    nTaunt = ClipRange(nTaunt-10, 0, 1);
-                    sfxPlay3DSoundCP(gPlayer[nPlayer].pSprite, 172+nTaunt, 1, 0, 0, 128);
+                    nTaunt = ClipRange(nTaunt-10, 0, 4);
+                    sfxPlay3DSoundCP(gPlayer[nPlayer].pSprite, 1008+nTaunt, 1, 0, 0, 128);
                     break;
                 }
                 nTaunt = ClipRange(nTaunt, 0, 9);
@@ -589,6 +591,8 @@ void netBroadcastPlayerInfo(int nPlayer)
     pProfile->nWeaponSwitch = gWeaponSwitch;
     pProfile->bWeaponFastSwitch = gWeaponFastSwitch;
     pProfile->nTeamPreference = gPlayerTeamPreference;
+    pProfile->nColorPreference = gPlayerColorPreference;
+    pProfile->nModel = gPlayerModel;
     pProfile->nWeaponHBobbing = gWeaponHBobbing;
     gProfileNet[nPlayer] = gProfile[nPlayer];
     if (numplayers < 2)
@@ -608,6 +612,8 @@ void netBroadcastPlayerInfoUpdate(int nPlayer)
     pProfile->nWeaponSwitch = gWeaponSwitch;
     pProfile->bWeaponFastSwitch = gWeaponFastSwitch;
     pProfile->nTeamPreference = gPlayerTeamPreference;
+    pProfile->nColorPreference = gPlayerColorPreference;
+    pProfile->nModel = gPlayerModel;
     pProfile->nWeaponHBobbing = gWeaponHBobbing;
     if (numplayers < 2)
         return;
@@ -645,19 +651,19 @@ void netBroadcastTaunt(int nPlayer, int nTaunt)
     sndStartSample(4400+nTaunt, 128, 1, 0);
 }
 
-void netBroadcastFart(int nPlayer)
+void netBroadcastTauntRandom(int nPlayer)
 {
-    if (gPlayer[nPlayer].pXSprite && (gPlayer[nPlayer].pXSprite->health == 0) && !VanillaMode()) // if player is dead, don't send fart message
+    if (gPlayer[nPlayer].pXSprite && (gPlayer[nPlayer].pXSprite->health == 0) && !VanillaMode()) // if player is dead, don't send taunt message
         return;
-    const int nFart = QRandom(2);
+    const int nTaunt = QRandom(5);
     if (numplayers > 1)
     {
         char *pPacket = packet;
         PutPacketByte(pPacket, 4);
-        PutPacketByte(pPacket, 10+nFart);
+        PutPacketByte(pPacket, 10+nTaunt);
         netSendPacketAll(packet, pPacket-packet);
     }
-    sndStartSample(172+nFart, 2, 1, 0);
+    sndStartSample(1008+nTaunt, 2, 1, 0);
 }
 
 void netBroadcastMessage(int nPlayer, const char *pzMessage)
@@ -722,7 +728,7 @@ void netSendEmptyPackets(void)
     {
         if (nClock <= totalclock)
         {
-            nClock = totalclock+4;
+            nClock = totalclock+kTicsPerFrame;
             netSendPacketAll(packet, pPacket-packet);
         }
     }
@@ -1165,9 +1171,14 @@ void netInitialize(bool bConsole, bool bAnnounce)
             viewLoadingScreen(gMenuPicnum, "Network Game", NULL, buffer);
             videoNextPage();
         }
-        gNetENetAddressLocal.host = ENET_HOST_ANY;
-        gNetENetAddressLocal.port = gNetPortLocal;
-        gNetENetClient = enet_host_create(&gNetENetAddressLocal, 1, BLOOD_ENET_CHANNEL_MAX, 0, 0);
+        if (gNetPortLocal != -1)
+        {
+            gNetENetAddressLocal.host = ENET_HOST_ANY;
+            gNetENetAddressLocal.port = gNetPortLocal;
+            gNetENetClient = enet_host_create(&gNetENetAddressLocal, 1, BLOOD_ENET_CHANNEL_MAX, 0, 0);
+        }
+        else
+            gNetENetClient = enet_host_create(NULL, 1, BLOOD_ENET_CHANNEL_MAX, 0, 0);
         enet_address_set_host(&gNetENetAddress, gNetAddress);
         gNetENetAddress.port = gNetPort;
         gNetENetPeer = enet_host_connect(gNetENetClient, &gNetENetAddress, BLOOD_ENET_CHANNEL_MAX, 0);

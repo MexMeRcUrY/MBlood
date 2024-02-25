@@ -74,6 +74,7 @@ void SetViewBobbing(CGameMenuItemZBool *);
 void SetViewSwaying(CGameMenuItemZBool *);
 void SetWeaponSwaying(CGameMenuItemZCycle *);
 void SetWeaponInterpolate(CGameMenuItemZCycle *);
+void SetViewInterpolate(CGameMenuItemZBool *);
 void SetLevelCompleteTime(CGameMenuItemZBool *);
 void SetMirrorMode(CGameMenuItemZCycle *);
 void SetSlowRoomFlicker(CGameMenuItemZBool *);
@@ -99,6 +100,7 @@ void SetVideoMode(CGameMenuItemChain *);
 void SetWidescreen(CGameMenuItemZBool *);
 void SetWeaponSelectMode(CGameMenuItemZCycle *);
 void SetDetail(CGameMenuItemSlider *);
+void SetVoxels(CGameMenuItemZBool *);
 void SetFOV(CGameMenuItemSlider *);
 void UpdateVideoModeMenuFrameLimit(CGameMenuItemZCycle *pItem);
 //void UpdateVideoModeMenuFPSOffset(CGameMenuItemSlider *pItem);
@@ -239,6 +241,13 @@ const char *zLengthStrings[] =
     "Unlimited",
     "Minutes",
     "Frags",
+};
+
+const char *pzMirrorModeStrings[] = {
+    "OFF",
+    "HORIZONTAL",
+    "VERTICAL",
+    "HORIZONTAL+VERTICAL"
 };
 
 const char *zDiffStrings[] =
@@ -494,20 +503,23 @@ CGameMenuItemChain itemNetStart11("START GAME", 1, 0, 175, 320, 1, 0, -1, StartN
 
 CGameMenuItemTitle itemNetGameTitle("GAME SETTINGS", 1, 160, 20, 2038);
 CGameMenuItemZCycle itemNetGameMode("GAME:", 3, 66, 35, 180, 0, SetNetGameMode, zNetGameTypes, ARRAY_SSIZE(zNetGameTypes), 0);
-CGameMenuItemZCycle itemNetGameCycleLength("LENGTH:", 3, 66, 45, 180, 0, SetNetGameMode, zLengthStrings, ARRAY_SSIZE(zLengthStrings), 0);
-CGameMenuItemSlider itemNetGameSliderLimit("LIMIT:", 3, 66, 55, 180, 1, 1, 255, 1, NULL, -1, -1, kMenuSliderValue);
+CGameMenuItemZCycle itemNetGameCycleLength("LENGTH:", 3, 66, 43, 180, 0, SetNetGameMode, zLengthStrings, ARRAY_SSIZE(zLengthStrings), 0);
+CGameMenuItemSlider itemNetGameSliderLimit("LIMIT:", 3, 66, 51, 180, 1, 1, 255, 1, NULL, -1, -1, kMenuSliderValue);
 CGameMenuItemZBool itemNetGameBoolExit("LEVEL EXIT:", 3, 66, 65, 180, true, NULL, NULL, NULL);
-CGameMenuItemZBool itemNetGameBoolTeleFrag("TELEFRAGS:", 3, 66, 75, 180, true, NULL, NULL, NULL);
-CGameMenuItemZBool itemNetGameBoolSkillOverride("PLAYER HANDICAP:", 3, 66, 85, 180, true, NULL, "ALLOWED", "OFF");
-CGameMenuItemZBool itemNetGameBoolFriendlyFire("FRIENDLY FIRE:", 3, 66, 95, 180, true, 0, NULL, NULL);
+CGameMenuItemZBool itemNetGameBoolTeleFrag("TELEFRAGS:", 3, 66, 73, 180, true, NULL, NULL, NULL);
+CGameMenuItemZBool itemNetGameBoolSkillOverride("PLAYER HANDICAP:", 3, 66, 81, 180, true, NULL, "ALLOWED", "OFF");
+CGameMenuItemZBool itemNetGameBoolModelOverride("PLAYER MODEL:", 3, 66, 89, 180, true, NULL, "CULTISTS/CALEB", "CALEB ONLY");
+CGameMenuItemZBool itemNetGameBoolFriendlyFire("FRIENDLY FIRE:", 3, 66, 97, 180, true, 0, NULL, NULL);
 CGameMenuItemZCycle itemNetGameCycleKey("KEYS SETTING:", 3, 66, 105, 180, 0, 0, zKeyStrings, ARRAY_SSIZE(zKeyStrings), 0);
-CGameMenuItemZCycle itemNetGameCycleItemWeapon("ITEM/WEAPON SETTING:", 3, 66, 115, 180, 0, SetNetGameMode, zKeepItemWeaponStrings, ARRAY_SSIZE(zKeepItemWeaponStrings), 0);
+CGameMenuItemZCycle itemNetGameCycleItemWeapon("ITEM/WEAPON SETTING:", 3, 66, 113, 180, 0, SetNetGameMode, zKeepItemWeaponStrings, ARRAY_SSIZE(zKeepItemWeaponStrings), 0);
 CGameMenuItemZBool itemNetGameBoolAutoTeams("AUTO TEAMS:", 3, 66, 105, 180, true, 0, NULL, NULL);
-CGameMenuItemZBool itemNetGameBoolTeamColors("TEAM COLORS:", 3, 66, 115, 180, true, 0, NULL, NULL);
-CGameMenuItemZCycle itemNetGameCycleSpawnLocation("SPAWN AREA:", 3, 66, 125, 180, 0, 0, zRespawnStrings, ARRAY_SSIZE(zRespawnStrings), 0);
-CGameMenuItemZCycle itemNetGameCycleShowWeaponsOverride("ENEMY WEAPONS:", 3, 66, 135, 180, 0, 0, zShowWeapon, ARRAY_SSIZE(zShowWeapon), 0);
+CGameMenuItemZBool itemNetGameBoolTeamColors("TEAM COLORS:", 3, 66, 113, 180, true, 0, NULL, NULL);
+CGameMenuItemZBool itemNetGameBoolTeamFlags("TEAM FLAGS:", 3, 66, 121, 180, true, 0, NULL, NULL);
+CGameMenuItemZCycle itemNetGameCycleSpawnLocation("SPAWN AREA:", 3, 66, 129, 180, 0, 0, zRespawnStrings, ARRAY_SSIZE(zRespawnStrings), 0);
+CGameMenuItemZCycle itemNetGameCycleShowWeaponsOverride("ENEMY WEAPONS:", 3, 66, 137, 180, 0, 0, zShowWeapon, ARRAY_SSIZE(zShowWeapon), 0);
 CGameMenuItemZCycle itemNetGameCycleSpawnProtection("SPAWN PROTECTION:", 3, 66, 145, 180, 0, 0, zSpawnProtectStrings, ARRAY_SSIZE(zSpawnProtectStrings), 0);
-CGameMenuItemZCycle itemNetGameCycleSpawnWeapon("SPAWN WITH WEAPON:", 3, 66, 155, 180, 0, SetNetGameMode, zSpawnWeaponStrings, ARRAY_SSIZE(zSpawnWeaponStrings), 0);
+CGameMenuItemZCycle itemNetGameCycleSpawnWeapon("SPAWN WITH WEAPON:", 3, 66, 153, 180, 0, SetNetGameMode, zSpawnWeaponStrings, ARRAY_SSIZE(zSpawnWeaponStrings), 0);
+CGameMenuItemZCycle itemNetGameCycleMirrorModeOverride("MIRROR MODE:", 3, 66, 161, 180, 0, NULL, pzMirrorModeStrings, ARRAY_SSIZE(pzMirrorModeStrings), 0);
 
 CGameMenuItemTitle itemNetMonsterTitle("MONSTERS", 1, 160, 20, 2038);
 CGameMenuItemZCycle itemNetMonsterSettings("MONSTERS:", 3, 66, 40, 180, 0, SetNetMonsterMenu, zMonsterStrings, ARRAY_SSIZE(zMonsterStrings), 0);
@@ -661,13 +673,6 @@ const char *pzWeaponInterpolateStrings[] = {
     "ALL ANIMATION"
 };
 
-const char *pzMirrorModeStrings[] = {
-    "OFF",
-    "HORIZONTAL",
-    "VERTICAL",
-    "HORIZONTAL+VERTICAL"
-};
-
 void SetAutoAim(CGameMenuItemZCycle *pItem);
 void SetLevelStats(CGameMenuItemZCycle *pItem);
 void SetPowerupDuration(CGameMenuItemZCycle *pItem);
@@ -711,14 +716,15 @@ CGameMenuItemChain itemOptionsDisplayColor("COLOR CORRECTION", 3, 66, 40, 180, 0
 CGameMenuItemChain itemOptionsDisplayMode("VIDEO MODE", 3, 66, 50, 180, 0, &menuOptionsDisplayMode, -1, SetupVideoModeMenu, 0);
 CGameMenuItemChain itemOptionsDisplayView("VIEW SETUP", 3, 66, 60, 180, 0, &menuOptionsDisplayView, -1, NULL, 0);
 CGameMenuItemSlider itemOptionsDisplayDetail("DETAIL:", 3, 66, 80, 180, &gDetail, 0, 4, 1, SetDetail, -1, -1);
-CGameMenuItemZCycle itemOptionsDisplayCrosshair("CROSSHAIR:", 3, 66, 90, 180, 0, SetCrosshair, pzCrosshairStrings, ARRAY_SSIZE(pzCrosshairStrings), 0);
-CGameMenuItemZCycle itemOptionsDisplayLevelStats("LEVEL STATS:", 3, 66, 100, 180, 0, SetLevelStats, pzStatsPowerupRatioStrings, ARRAY_SSIZE(pzStatsPowerupRatioStrings), 0);
-CGameMenuItemZCycle itemOptionsDisplayPowerupDuration("POWERUP DURATION:", 3, 66, 110, 180, 0, SetPowerupDuration, pzStatsPowerupRatioStrings, ARRAY_SSIZE(pzStatsPowerupRatioStrings), 0);
-CGameMenuItemZBool itemOptionsDisplayBoolShowMapTitle("MAP TITLE:", 3, 66, 120, 180, gShowMapTitle, SetShowMapTitle, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayBoolMessages("MESSAGES:", 3, 66, 130, 180, gMessageState, SetMessages, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayBoolWidescreen("WIDESCREEN:", 3, 66, 140, 180, r_usenewaspect, SetWidescreen, NULL, NULL);
-CGameMenuItemZCycle itemOptionsDisplayWeaponSelect("SHOW WEAPON SELECT:", 3, 66, 150, 180, 0, SetWeaponSelectMode, pzWeaponSelectStrings, ARRAY_SSIZE(pzWeaponSelectStrings), 0);
-CGameMenuItemSlider itemOptionsDisplayFOV("FOV:", 3, 66, 160, 180, &gFov, 75, 140, 1, SetFOV, -1, -1, kMenuSliderValue);
+CGameMenuItemZBool itemOptionsDisplayBoolVoxels("VOXELS:", 3, 66, 90, 180, 0, SetVoxels, NULL, NULL);
+CGameMenuItemZCycle itemOptionsDisplayCrosshair("CROSSHAIR:", 3, 66, 100, 180, 0, SetCrosshair, pzCrosshairStrings, ARRAY_SSIZE(pzCrosshairStrings), 0);
+CGameMenuItemZCycle itemOptionsDisplayLevelStats("LEVEL STATS:", 3, 66, 110, 180, 0, SetLevelStats, pzStatsPowerupRatioStrings, ARRAY_SSIZE(pzStatsPowerupRatioStrings), 0);
+CGameMenuItemZCycle itemOptionsDisplayPowerupDuration("POWERUP DURATION:", 3, 66, 120, 180, 0, SetPowerupDuration, pzStatsPowerupRatioStrings, ARRAY_SSIZE(pzStatsPowerupRatioStrings), 0);
+CGameMenuItemZBool itemOptionsDisplayBoolShowMapTitle("MAP TITLE:", 3, 66, 130, 180, gShowMapTitle, SetShowMapTitle, NULL, NULL);
+CGameMenuItemZBool itemOptionsDisplayBoolMessages("MESSAGES:", 3, 66, 140, 180, gMessageState, SetMessages, NULL, NULL);
+CGameMenuItemZBool itemOptionsDisplayBoolWidescreen("WIDESCREEN:", 3, 66, 150, 180, r_usenewaspect, SetWidescreen, NULL, NULL);
+CGameMenuItemZCycle itemOptionsDisplayWeaponSelect("SHOW WEAPON SELECT:", 3, 66, 160, 180, 0, SetWeaponSelectMode, pzWeaponSelectStrings, ARRAY_SSIZE(pzWeaponSelectStrings), 0);
+CGameMenuItemSlider itemOptionsDisplayFOV("FOV:", 3, 66, 170, 180, &gFov, 75, 140, 1, SetFOV, -1, -1, kMenuSliderValue);
 #ifdef USE_OPENGL
 CGameMenuItemChain itemOptionsDisplayPolymost("POLYMOST SETUP", 3, 66, 180, 180, 0, &menuOptionsDisplayPolymost, -1, SetupVideoPolymostMenu, 0);
 #endif
@@ -805,14 +811,15 @@ CGameMenuItemSliderFloat itemOptionsDisplayColorVisibility("VISIBILITY:", 3, 66,
 CGameMenuItemChain itemOptionsDisplayColorReset("RESET TO DEFAULTS", 3, 66, 150, 180, 0, NULL, 0, ResetVideoColor, 0);
 
 CGameMenuItemTitle itemOptionsDisplayViewTitle("VIEW SETUP", 1, 160, 20, 2038);
-CGameMenuItemSlider itemOptionsDisplayViewHudSize("HUD SIZE:", 3, 66, 60, 180, &gViewSize, 0, 9, 1, SetHudSize, -1, -1, kMenuSliderValue);
-CGameMenuItemZCycle itemOptionsDisplayViewHudRatio("HUD ALIGNMENT:", 3, 66, 70, 180, 0, SetHudRatio, pzHudRatioStrings, ARRAY_SSIZE(pzHudRatioStrings), 0);
-CGameMenuItemZBool itemOptionsDisplayViewBoolCenterHoriz("CENTER HORIZON LINE:", 3, 66, 80, 180, gCenterHoriz, SetCenterHoriz, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayViewBoolSlopeTilting("SLOPE TILTING:", 3, 66, 90, 180, gSlopeTilting, SetSlopeTilting, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayViewBoolViewBobbing("VIEW BOBBING:", 3, 66, 100, 180, gViewVBobbing, SetViewBobbing, NULL, NULL);
-CGameMenuItemZBool itemOptionsDisplayViewBoolViewSwaying("VIEW SWAYING:", 3, 66, 110, 180, gViewHBobbing, SetViewSwaying, NULL, NULL);
-CGameMenuItemZCycle itemOptionsDisplayViewWeaponSwaying("WEAPON SWAYING:", 3, 66, 120, 180, 0, SetWeaponSwaying, pzWeaponHBobbingStrings, ARRAY_SSIZE(pzWeaponHBobbingStrings), 0);
-CGameMenuItemZCycle itemOptionsDisplayViewWeaponInterpolation("WEAPON SMOOTHING:", 3, 66, 130, 180, 0, SetWeaponInterpolate, pzWeaponInterpolateStrings, ARRAY_SSIZE(pzWeaponInterpolateStrings), 0);
+CGameMenuItemSlider itemOptionsDisplayViewHudSize("HUD SIZE:", 3, 66, 50, 180, &gViewSize, 0, 9, 1, SetHudSize, -1, -1, kMenuSliderValue);
+CGameMenuItemZCycle itemOptionsDisplayViewHudRatio("HUD ALIGNMENT:", 3, 66, 60, 180, 0, SetHudRatio, pzHudRatioStrings, ARRAY_SSIZE(pzHudRatioStrings), 0);
+CGameMenuItemZBool itemOptionsDisplayViewBoolCenterHoriz("CENTER HORIZON LINE:", 3, 66, 70, 180, gCenterHoriz, SetCenterHoriz, NULL, NULL);
+CGameMenuItemZBool itemOptionsDisplayViewBoolSlopeTilting("SLOPE TILTING:", 3, 66, 80, 180, gSlopeTilting, SetSlopeTilting, NULL, NULL);
+CGameMenuItemZBool itemOptionsDisplayViewBoolViewBobbing("VIEW BOBBING:", 3, 66, 90, 180, gViewVBobbing, SetViewBobbing, NULL, NULL);
+CGameMenuItemZBool itemOptionsDisplayViewBoolViewSwaying("VIEW SWAYING:", 3, 66, 100, 180, gViewHBobbing, SetViewSwaying, NULL, NULL);
+CGameMenuItemZCycle itemOptionsDisplayViewWeaponSwaying("WEAPON SWAYING:", 3, 66, 110, 180, 0, SetWeaponSwaying, pzWeaponHBobbingStrings, ARRAY_SSIZE(pzWeaponHBobbingStrings), 0);
+CGameMenuItemZCycle itemOptionsDisplayViewWeaponInterpolation("WEAPON SMOOTHING:", 3, 66, 120, 180, 0, SetWeaponInterpolate, pzWeaponInterpolateStrings, ARRAY_SSIZE(pzWeaponInterpolateStrings), 0);
+CGameMenuItemZBool itemOptionsDisplayViewBoolInterpolation("VIEW INTERPOLATE:", 3, 66, 130, 180, gViewInterpolateMethod, SetViewInterpolate, "MODERN", "ORIGINAL");
 CGameMenuItemZBool itemOptionsDisplayViewBoolLevelCompleteTime("LEVEL TIME AT INTERMISSION:", 3, 66, 140, 180, gShowCompleteTime, SetLevelCompleteTime, "SHOW", "HIDE");
 CGameMenuItemZBool itemOptionsDisplayViewBoolPowerupStyle("POWERUP STYLE:", 3, 66, 150, 180, gPowerupStyle, SetPowerupStyle, "NOTBLOOD", "NBLOOD");
 CGameMenuItemZCycle itemOptionsDisplayViewMirrorMode("MIRROR MODE:", 3, 66, 160, 180, 0, SetMirrorMode, pzMirrorModeStrings, ARRAY_SSIZE(pzMirrorModeStrings), 0);
@@ -967,6 +974,8 @@ CGameMenuItemChain itemOptionsSoundApplyChanges("APPLY CHANGES", 3, 66, 170, 180
 void UpdatePlayerName(CGameMenuItemZEdit *pItem, CGameMenuEvent *pEvent);
 void UpdatePlayerSkill(CGameMenuItemZCycle *pItem);
 void UpdatePlayerTeamPreference(CGameMenuItemZCycle *pItem);
+void UpdatePlayerColorPreference(CGameMenuItemZCycle *pItem);
+void UpdatePlayerModel(CGameMenuItemZBool *pItem);
 void SetShowPlayerNames(CGameMenuItemZBool *);
 void SetShowWeapons(CGameMenuItemZCycle *);
 void UpdatePlayerChatMessageSound(CGameMenuItemZBool *pItem);
@@ -974,7 +983,6 @@ void UpdatePlayerColorMessages(CGameMenuItemZBool *pItem);
 void UpdatePlayerKillObituaryMessages(CGameMenuItemZBool *pItem);
 void UpdatePlayerKillMessage(CGameMenuItemZBool *pItem);
 void UpdatePlayerMultiKill(CGameMenuItemZCycle *pItem);
-void UpdatePlayerStompKillSound(CGameMenuItemZBool *pItem);
 
 const char *pzPlayerMultiKillStrings[] = {
     "OFF",
@@ -996,6 +1004,15 @@ const char *pzPlayerTeamPreferenceStrings[] = {
     "RED"
 };
 
+
+const char *pzPlayerColorPreferenceStrings[] = {
+    "NONE",
+    "BLUE",
+    "RED",
+    "TEAL",
+    "GRAY",
+};
+
 const char *pzShowWeaponStrings[] = {
     "OFF",
     "SPRITE",
@@ -1003,17 +1020,18 @@ const char *pzShowWeaponStrings[] = {
 };
 
 CGameMenuItemTitle itemOptionsPlayerTitle("PLAYER SETUP", 1, 160, 20, 2038);
-CGameMenuItemZEdit itemOptionsPlayerName("PLAYER NAME:", 3, 66, 50, 180, szPlayerName, MAXPLAYERNAME, 0, UpdatePlayerName, 0);
-CGameMenuItemZCycle itemOptionsPlayerSkill("HEALTH HANDICAP:", 3, 66, 60, 180, 0, UpdatePlayerSkill, pzPlayerSkillStrings, ARRAY_SIZE(pzPlayerSkillStrings), 0);
-CGameMenuItemZCycle itemOptionsPlayerTeamPreference("TEAM PREFERENCE:", 3, 66, 70, 180, 0, UpdatePlayerTeamPreference, pzPlayerTeamPreferenceStrings, ARRAY_SIZE(pzPlayerTeamPreferenceStrings), 0);
-CGameMenuItemZBool itemOptionsPlayerBoolShowPlayerNames("SHOW PLAYER NAMES:", 3, 66, 90, 180, gShowPlayerNames, SetShowPlayerNames, NULL, NULL);
-CGameMenuItemZCycle itemOptionsPlayerShowWeapons("SHOW WEAPONS:", 3, 66, 100, 180, 0, SetShowWeapons, pzShowWeaponStrings, ARRAY_SSIZE(pzShowWeaponStrings), 0);
-CGameMenuItemZBool itemOptionsPlayerChatSound("MESSAGE BEEP:", 3, 66, 110, 180, true, UpdatePlayerChatMessageSound, NULL, NULL);
-CGameMenuItemZBool itemOptionsPlayerColorMsg("COLORED MESSAGES:", 3, 66, 120, 180, true, UpdatePlayerColorMessages, NULL, NULL);
-CGameMenuItemZBool itemOptionsPlayerObituaryMsg("USE OBITUARY MESSAGES:", 3, 66, 130, 180, true, UpdatePlayerKillObituaryMessages, NULL, NULL);
-CGameMenuItemZBool itemOptionsPlayerKillMsg("SHOW KILLS ON HUD:", 3, 66, 140, 180, true, UpdatePlayerKillMessage, NULL, NULL);
-CGameMenuItemZCycle itemOptionsPlayerMultiKill("MULTI KILL MESSAGES:", 3, 66, 150, 180, 0, UpdatePlayerMultiKill, pzPlayerMultiKillStrings, ARRAY_SIZE(pzPlayerMultiKillStrings), 0);
-CGameMenuItemZBool itemOptionsPlayerStompKillSound("STOMP KILL SOUND:", 3, 66, 160, 180, 0, UpdatePlayerStompKillSound, NULL, NULL);
+CGameMenuItemZEdit itemOptionsPlayerName("PLAYER NAME:", 3, 66, 40, 180, szPlayerName, MAXPLAYERNAME, 0, UpdatePlayerName, 0);
+CGameMenuItemZCycle itemOptionsPlayerSkill("HEALTH HANDICAP:", 3, 66, 50, 180, 0, UpdatePlayerSkill, pzPlayerSkillStrings, ARRAY_SIZE(pzPlayerSkillStrings), 0);
+CGameMenuItemZCycle itemOptionsPlayerTeamPreference("TEAM PREFERENCE:", 3, 66, 60, 180, 0, UpdatePlayerTeamPreference, pzPlayerTeamPreferenceStrings, ARRAY_SIZE(pzPlayerTeamPreferenceStrings), 0);
+CGameMenuItemZCycle itemOptionsPlayerColorPreference("COLOR PREFERENCE:", 3, 66, 70, 180, 0, UpdatePlayerColorPreference, pzPlayerColorPreferenceStrings, ARRAY_SIZE(pzPlayerColorPreferenceStrings), 0);
+CGameMenuItemZBool itemOptionsPlayerModel("PLAYER MODEL:", 3, 66, 80, 180, false, UpdatePlayerModel, "CULTIST", "CALEB");
+CGameMenuItemZBool itemOptionsPlayerBoolShowPlayerNames("SHOW PLAYER NAMES:", 3, 66, 100, 180, gShowPlayerNames, SetShowPlayerNames, NULL, NULL);
+CGameMenuItemZCycle itemOptionsPlayerShowWeapons("SHOW WEAPONS:", 3, 66, 110, 180, 0, SetShowWeapons, pzShowWeaponStrings, ARRAY_SSIZE(pzShowWeaponStrings), 0);
+CGameMenuItemZBool itemOptionsPlayerChatSound("MESSAGE BEEP:", 3, 66, 120, 180, true, UpdatePlayerChatMessageSound, NULL, NULL);
+CGameMenuItemZBool itemOptionsPlayerColorMsg("COLORED MESSAGES:", 3, 66, 130, 180, true, UpdatePlayerColorMessages, NULL, NULL);
+CGameMenuItemZBool itemOptionsPlayerObituaryMsg("USE OBITUARY MESSAGES:", 3, 66, 140, 180, true, UpdatePlayerKillObituaryMessages, NULL, NULL);
+CGameMenuItemZBool itemOptionsPlayerKillMsg("SHOW KILLS ON HUD:", 3, 66, 150, 180, true, UpdatePlayerKillMessage, NULL, NULL);
+CGameMenuItemZCycle itemOptionsPlayerMultiKill("MULTI KILL MESSAGES:", 3, 66, 160, 180, 0, UpdatePlayerMultiKill, pzPlayerMultiKillStrings, ARRAY_SIZE(pzPlayerMultiKillStrings), 0);
 
 #define JOYSTICKITEMSPERPAGE 16 // this must be an even value, as double tap inputs rely on odd index position
 #define MAXJOYSTICKBUTTONPAGES (max(1, (MAXJOYBUTTONSANDHATS*2 / JOYSTICKITEMSPERPAGE))) // we double all buttons/hats so each input can be bind for double tap
@@ -1093,7 +1111,7 @@ void NetworkBrowserJoin(CGameMenuItemChain *pItem);
 
 char zNetAddressBuffer[16] = "localhost";
 char zNetPortBuffer[6] = "23513";
-char zNetBrowserGame[8][16+1+5] = {{'\0'}};
+char zNetBrowserGame[8][64] = {{'\0'}};
 char zNetBrowserState[32] = "SEARCHING...";
 
 CGameMenuItemTitle itemNetworkTitle("MULTIPLAYER", 1, 160, 20, 2038);
@@ -1424,25 +1442,33 @@ void SetupNetStartMenu(void)
     menuNetworkGameMode.Add(&itemNetGameBoolExit, false);
     menuNetworkGameMode.Add(&itemNetGameBoolTeleFrag, false);
     menuNetworkGameMode.Add(&itemNetGameBoolSkillOverride, false);
+    menuNetworkGameMode.Add(&itemNetGameBoolModelOverride, false);
     menuNetworkGameMode.Add(&itemNetGameBoolFriendlyFire, false);
     menuNetworkGameMode.Add(&itemNetGameCycleKey, false);
     menuNetworkGameMode.Add(&itemNetGameCycleItemWeapon, false);
     menuNetworkGameMode.Add(&itemNetGameBoolAutoTeams, false);
     menuNetworkGameMode.Add(&itemNetGameBoolTeamColors, false);
+    menuNetworkGameMode.Add(&itemNetGameBoolTeamFlags, false);
     menuNetworkGameMode.Add(&itemNetGameCycleSpawnLocation, false);
     menuNetworkGameMode.Add(&itemNetGameCycleShowWeaponsOverride, false);
     menuNetworkGameMode.Add(&itemNetGameCycleSpawnProtection, false);
     menuNetworkGameMode.Add(&itemNetGameCycleSpawnWeapon, false);
+    menuNetworkGameMode.Add(&itemNetGameCycleMirrorModeOverride, false);
     menuNetworkGameMode.Add(&itemBloodQAV, false);
     itemNetGameBoolExit.tooltip_pzTextUpper = "Toggle level exit switch functionality";
     itemNetGameBoolTeleFrag.tooltip_pzTextUpper = "Toggle telefrags kills";
     itemNetGameBoolSkillOverride.tooltip_pzTextUpper = "Toggle player health handicap";
     itemNetGameBoolSkillOverride.tooltip_pzTextLower = "(When off, use difficulty setting)";
+    itemNetGameBoolModelOverride.tooltip_pzTextUpper = "Set global setting for player models";
+    itemNetGameBoolModelOverride.tooltip_pzTextLower = "(This is applied to all players in round)";
     itemNetGameBoolAutoTeams.tooltip_pzTextUpper = "Automatically sort players into teams";
     itemNetGameBoolTeamColors.tooltip_pzTextUpper = "Highlight players with team colors";
+    itemNetGameBoolTeamFlags.tooltip_pzTextUpper = "Toggle team flags for teams mode";
     itemNetGameCycleSpawnLocation.tooltip_pzTextUpper = "Set spawn location behavior";
     itemNetGameCycleShowWeaponsOverride.tooltip_pzTextUpper = "Set global setting for show weapons option";
     itemNetGameCycleShowWeaponsOverride.tooltip_pzTextLower = "(This is applied to all players in round)";
+    itemNetGameCycleMirrorModeOverride.tooltip_pzTextUpper = "Set global setting for mirror mode";
+    itemNetGameCycleMirrorModeOverride.tooltip_pzTextLower = "(This is applied to all players in round)";
 
     menuNetworkGameMonsters.Add(&itemNetMonsterTitle, false);
     menuNetworkGameMonsters.Add(&itemNetMonsterSettings, true);
@@ -1782,6 +1808,7 @@ void SetupOptionsMenu(void)
     menuOptionsDisplay.Add(&itemOptionsDisplayMode, false);
     menuOptionsDisplay.Add(&itemOptionsDisplayView, false);
     menuOptionsDisplay.Add(&itemOptionsDisplayDetail, false);
+    menuOptionsDisplay.Add(&itemOptionsDisplayBoolVoxels, false);
     menuOptionsDisplay.Add(&itemOptionsDisplayCrosshair, false);
     menuOptionsDisplay.Add(&itemOptionsDisplayLevelStats, false);
     menuOptionsDisplay.Add(&itemOptionsDisplayPowerupDuration, false);
@@ -1794,6 +1821,7 @@ void SetupOptionsMenu(void)
     menuOptionsDisplay.Add(&itemOptionsDisplayPolymost, false);
 #endif
     menuOptionsDisplay.Add(&itemBloodQAV, false);
+    itemOptionsDisplayBoolVoxels.at20 = usevoxels;
     itemOptionsDisplayCrosshair.m_nFocus = gAimReticle % ARRAY_SSIZE(pzCrosshairStrings);
     itemOptionsDisplayLevelStats.m_nFocus = gLevelStats % ARRAY_SSIZE(pzStatsPowerupRatioStrings);
     itemOptionsDisplayPowerupDuration.m_nFocus = gPowerupDuration % ARRAY_SSIZE(pzStatsPowerupRatioStrings);
@@ -1880,15 +1908,19 @@ void SetupOptionsMenu(void)
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewBoolViewSwaying, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewWeaponSwaying, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewWeaponInterpolation, false);
+    menuOptionsDisplayView.Add(&itemOptionsDisplayViewBoolInterpolation, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewBoolLevelCompleteTime, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewBoolPowerupStyle, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewMirrorMode, false);
     menuOptionsDisplayView.Add(&itemOptionsDisplayViewBoolSlowRoomFlicker, false);
     menuOptionsDisplayView.Add(&itemBloodQAV, false);
+    itemOptionsDisplayViewMirrorMode.bDisableForNet = 1;
     itemOptionsDisplayViewBoolSlopeTilting.tooltip_pzTextUpper = "";
     itemOptionsDisplayViewBoolSlopeTilting.tooltip_pzTextLower = "Tilt view when looking towards slope";
     itemOptionsDisplayViewWeaponInterpolation.tooltip_pzTextUpper = "";
     itemOptionsDisplayViewWeaponInterpolation.tooltip_pzTextLower = "Interpolate QAV weapon animations (experimental)";
+    itemOptionsDisplayViewBoolInterpolation.tooltip_pzTextUpper = "";
+    itemOptionsDisplayViewBoolInterpolation.tooltip_pzTextLower = "Set interpolation method (original/integer or modern/float)";
     itemOptionsDisplayViewBoolPowerupStyle.tooltip_pzTextUpper = "";
     itemOptionsDisplayViewBoolPowerupStyle.tooltip_pzTextLower = "Set the display style for power-ups";
     itemOptionsDisplayViewBoolSlowRoomFlicker.tooltip_pzTextUpper = "";
@@ -1901,6 +1933,7 @@ void SetupOptionsMenu(void)
     itemOptionsDisplayViewBoolViewSwaying.at20 = gViewHBobbing;
     itemOptionsDisplayViewWeaponSwaying.m_nFocus = gWeaponHBobbing % ARRAY_SSIZE(pzWeaponHBobbingStrings);
     itemOptionsDisplayViewWeaponInterpolation.m_nFocus = gWeaponInterpolate % ARRAY_SSIZE(pzWeaponInterpolateStrings);
+    itemOptionsDisplayViewBoolInterpolation.at20 = gViewInterpolateMethod;
     itemOptionsDisplayViewBoolLevelCompleteTime.at20 = gShowCompleteTime;
     itemOptionsDisplayViewBoolPowerupStyle.at20 = gPowerupStyle;
     itemOptionsDisplayViewMirrorMode.m_nFocus = r_mirrormode % ARRAY_SSIZE(pzMirrorModeStrings);
@@ -1960,6 +1993,8 @@ void SetupOptionsMenu(void)
     menuOptionsPlayer.Add(&itemOptionsPlayerName, true);
     menuOptionsPlayer.Add(&itemOptionsPlayerSkill, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerTeamPreference, false);
+    menuOptionsPlayer.Add(&itemOptionsPlayerColorPreference, false);
+    menuOptionsPlayer.Add(&itemOptionsPlayerModel, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerBoolShowPlayerNames, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerShowWeapons, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerChatSound, false);
@@ -1967,10 +2002,12 @@ void SetupOptionsMenu(void)
     menuOptionsPlayer.Add(&itemOptionsPlayerObituaryMsg, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerKillMsg, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerMultiKill, false);
-    menuOptionsPlayer.Add(&itemOptionsPlayerStompKillSound, false);
     menuOptionsPlayer.Add(&itemBloodQAV, false);
     itemOptionsPlayerSkill.tooltip_pzTextUpper = "Set player's damage taken handicap";
-    itemOptionsPlayerTeamPreference.tooltip_pzTextUpper = "Set player's preferred team for team mode";
+    itemOptionsPlayerTeamPreference.tooltip_pzTextUpper = "Set player's preferred team";
+    itemOptionsPlayerColorPreference.tooltip_pzTextUpper = "Set player's preferred color";
+    itemOptionsPlayerColorPreference.tooltip_pzTextLower = "(for bloodbath/co-op mode)";
+    itemOptionsPlayerModel.tooltip_pzTextUpper = "Set player's sprite model";
     itemOptionsPlayerBoolShowPlayerNames.tooltip_pzTextUpper = "Display player's name";
     itemOptionsPlayerBoolShowPlayerNames.tooltip_pzTextLower = "over crosshair";
     itemOptionsPlayerShowWeapons.tooltip_pzTextUpper = "Display player's weapon";
@@ -1982,10 +2019,11 @@ void SetupOptionsMenu(void)
     itemOptionsPlayerKillMsg.tooltip_pzTextLower = "(for bloodbath/teams mode)";
     itemOptionsPlayerMultiKill.tooltip_pzTextUpper = "Show multi kill alerts on screen";
     itemOptionsPlayerMultiKill.tooltip_pzTextLower = "(for bloodbath/teams mode)";
-    itemOptionsPlayerStompKillSound.tooltip_pzTextUpper = "Play sound when stomp killing another player";
 
     itemOptionsPlayerSkill.m_nFocus = 4 - (gSkill % ARRAY_SSIZE(pzPlayerSkillStrings)); // invert because string order is reversed (lower skill == easier)
     itemOptionsPlayerTeamPreference.m_nFocus = gPlayerTeamPreference % ARRAY_SSIZE(pzPlayerTeamPreferenceStrings);
+    itemOptionsPlayerColorPreference.m_nFocus = gPlayerColorPreference % ARRAY_SSIZE(pzPlayerColorPreferenceStrings);
+    itemOptionsPlayerModel.at20 = gPlayerModel;
     itemOptionsPlayerBoolShowPlayerNames.at20 = gShowPlayerNames;
     itemOptionsPlayerShowWeapons.m_nFocus = gShowWeapon;
     itemOptionsPlayerChatSound.at20 = gChatSnd;
@@ -1993,7 +2031,6 @@ void SetupOptionsMenu(void)
     itemOptionsPlayerObituaryMsg.at20 = gKillObituary;
     itemOptionsPlayerKillMsg.at20 = gKillMsg;
     itemOptionsPlayerMultiKill.m_nFocus = gMultiKill % ARRAY_SSIZE(pzPlayerMultiKillStrings);
-    itemOptionsPlayerStompKillSound.at20 = gStompSound;
 }
 
 void SetupControlsMenu(void)
@@ -2261,6 +2298,11 @@ void SetMonoStereo(CGameMenuItemZBool *pItem)
     itemOptionsSoundDoppler.bEnable = gStereo;
 }
 
+void SetVoxels(CGameMenuItemZBool *pItem)
+{
+    usevoxels = pItem->at20;
+}
+
 void SetCrosshair(CGameMenuItemZCycle *pItem)
 {
     gAimReticle = pItem->m_nFocus % ARRAY_SSIZE(pzCrosshairStrings);
@@ -2472,6 +2514,11 @@ void SetWeaponInterpolate(CGameMenuItemZCycle *pItem)
     gWeaponInterpolate = pItem->m_nFocus % ARRAY_SSIZE(pzWeaponInterpolateStrings);
 }
 
+void SetViewInterpolate(CGameMenuItemZBool *pItem)
+{
+    gViewInterpolateMethod = pItem->at20;
+}
+
 void SetLevelCompleteTime(CGameMenuItemZBool *pItem)
 {
     gShowCompleteTime = pItem->at20;
@@ -2479,7 +2526,10 @@ void SetLevelCompleteTime(CGameMenuItemZBool *pItem)
 
 void SetMirrorMode(CGameMenuItemZCycle *pItem)
 {
-    r_mirrormode = pItem->m_nFocus % ARRAY_SSIZE(pzMirrorModeStrings);
+    if (pItem == NULL)
+        pItem = &itemOptionsDisplayViewMirrorMode;
+    if (!r_mirrormodelock)
+        r_mirrormode = pItem->m_nFocus % ARRAY_SSIZE(pzMirrorModeStrings);
 }
 
 void SetSlowRoomFlicker(CGameMenuItemZBool *pItem)
@@ -2643,6 +2693,7 @@ void SetGameVanillaMode(char nState)
     gVanilla = nState % ARRAY_SSIZE(pzVanillaModeStrings);
     itemOptionsGameWeaponFastSwitch.bEnable = !gVanilla;
     itemOptionsGameBoolVanillaMode.m_nFocus = gVanilla % ARRAY_SSIZE(pzVanillaModeStrings);
+    itemOptionsDisplayViewBoolInterpolation.bEnable = !gVanilla;
     itemOptionsDisplayWeaponSelect.bEnable = !gVanilla;
     itemOptionsChainMutators.bEnable = !gVanilla;
     VanillaModeUpdate();
@@ -2658,6 +2709,7 @@ void SetVanillaMode(CGameMenuItemZCycle *pItem)
     else
         pItem->m_nFocus = gVanilla % ARRAY_SSIZE(pzVanillaModeStrings);
     viewResizeView(gViewSize);
+    gGameMessageMgr.Clear();
 }
 
 inline unsigned int SetBannedSprites(char bSinglePlayer)
@@ -3192,6 +3244,8 @@ void SetNetGameMode(CGameMenuItemZCycle *pItem)
         itemNetGameBoolAutoTeams.bNoDraw = !itemNetGameBoolAutoTeams.bEnable;
         itemNetGameBoolTeamColors.bEnable = (pItem->m_nFocus+1) == kGameTypeTeams;
         itemNetGameBoolTeamColors.bNoDraw = !itemNetGameBoolTeamColors.bEnable;
+        itemNetGameBoolTeamFlags.bEnable = (pItem->m_nFocus+1) == kGameTypeTeams;
+        itemNetGameBoolTeamFlags.bNoDraw = !itemNetGameBoolTeamFlags.bEnable;
         itemNetGameCycleSpawnLocation.bEnable = (pItem->m_nFocus+1) != kGameTypeCoop;
         itemNetGameCycleSpawnLocation.bNoDraw = !itemNetGameCycleSpawnLocation.bEnable;
         return;
@@ -3377,6 +3431,20 @@ void UpdatePlayerTeamPreference(CGameMenuItemZCycle *pItem)
         netBroadcastPlayerInfoUpdate(myconnectindex);
 }
 
+void UpdatePlayerColorPreference(CGameMenuItemZCycle *pItem)
+{
+    gPlayerColorPreference = pItem->m_nFocus % ARRAY_SIZE(pzPlayerColorPreferenceStrings);
+    if ((numplayers > 1) || (gGameOptions.nGameType != kGameTypeSinglePlayer)) // if multiplayer session is active
+        netBroadcastPlayerInfoUpdate(myconnectindex);
+}
+
+void UpdatePlayerModel(CGameMenuItemZBool *pItem)
+{
+    gPlayerModel = pItem->at20;
+    if ((numplayers > 1) || (gGameOptions.nGameType != kGameTypeSinglePlayer)) // if multiplayer session is active
+        netBroadcastPlayerInfoUpdate(myconnectindex);
+}
+
 void SetShowPlayerNames(CGameMenuItemZBool *pItem)
 {
     gShowPlayerNames = pItem->at20;
@@ -3410,11 +3478,6 @@ void UpdatePlayerKillMessage(CGameMenuItemZBool *pItem)
 void UpdatePlayerMultiKill(CGameMenuItemZCycle *pItem)
 {
     gMultiKill = pItem->m_nFocus % ARRAY_SIZE(pzPlayerMultiKillStrings);
-}
-
-void UpdatePlayerStompKillSound(CGameMenuItemZBool *pItem)
-{
-    gStompSound = pItem->at20;
 }
 
 void SetMouseAimMode(CGameMenuItemZBool *pItem)
@@ -3790,12 +3853,12 @@ void NetworkJoinGame(CGameMenuItemChain *pItem)
     gQuitGame = gRestartGame = true;
 }
 
-void NetworkBrowserAdd(const char *pString, int nPort)
+void NetworkBrowserAdd(const char *pString, int nPort, const char *pHost, int nClientsCur, int nClientsMax)
 {
-    char szTemp[16+1+5];
+    char szTemp[64];
     int nSlotEmpty = -1;
 
-    Bsnprintf(szTemp, sizeof(szTemp), "%s %d", pString, nPort);
+    Bsnprintf(szTemp, sizeof(szTemp), "%s:%d (Host: %s, Players: %01d\\%01d)", pString, nPort, pHost, nClientsCur, nClientsMax);
     for (int nSlot = 0; (unsigned)nSlot < ARRAY_SIZE(pItemNetworkBrowserGame); nSlot++)
     {
         if (!Bstrncmp(szTemp, zNetBrowserGame[nSlot], sizeof(szTemp))) // already exists, don't add to server list
@@ -4075,12 +4138,20 @@ void StartNetGame(CGameMenuItemChain *pItem)
         gPacketStartGame.uNetGameFlags |= kNetGameFlagNoTeleFrag;
     if (!itemNetGameBoolSkillOverride.at20)
         gPacketStartGame.uNetGameFlags |= kNetGameFlagSkillIssue;
+    if (!itemNetGameBoolModelOverride.at20)
+        gPacketStartGame.uNetGameFlags |= kNetGameFlagCalebOnly;
     if (!itemNetGameBoolTeamColors.at20)
         gPacketStartGame.uNetGameFlags |= kNetGameFlagNoTeamColors;
+    if (!itemNetGameBoolTeamFlags.at20)
+        gPacketStartGame.uNetGameFlags |= kNetGameFlagNoTeamFlags;
     if (itemNetGameCycleSpawnLocation.m_nFocus > 0)
         gPacketStartGame.uNetGameFlags |= itemNetGameCycleSpawnLocation.m_nFocus == 1 ? kNetGameFlagSpawnSmart : kNetGameFlagSpawnDist;
     if (itemNetGameCycleShowWeaponsOverride.m_nFocus > 0)
         gPacketStartGame.uNetGameFlags |= itemNetGameCycleShowWeaponsOverride.m_nFocus == 1 ? kNetGameFlagHideWeaponsCloak : kNetGameFlagHideWeaponsAlways;
+    if (itemNetGameCycleMirrorModeOverride.m_nFocus & 1)
+        gPacketStartGame.uNetGameFlags |= kNetGameFlagMirrorHoriz;
+    if (itemNetGameCycleMirrorModeOverride.m_nFocus & 2)
+        gPacketStartGame.uNetGameFlags |= kNetGameFlagMirrorVert;
     gPacketStartGame.episodeId = itemNetStart2.m_nFocus;
     gPacketStartGame.levelId = itemNetStart3.m_nFocus;
     gPacketStartGame.difficulty = itemNetStart4.m_nFocus;

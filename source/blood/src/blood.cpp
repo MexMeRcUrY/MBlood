@@ -96,6 +96,7 @@ unsigned int nMaxAlloc = 0x4000000;
 
 bool bCustomName = false;
 char bAddUserMap = false;
+char bUseInternalMap = false, bUseInternalE = 0, bUseInternalL = 0;
 bool bNoDemo = false;
 bool bQuickNetStart = false;
 bool bQuickStart = false;
@@ -129,6 +130,7 @@ int gCacheMiss;
 int gMenuPicnum = 2518; // default menu picnum
 
 bool gNetPortOverride = false;
+char gNetMapOverride[BMAX_PATH] = "";
 bool gNetRetry = false;
 
 int gMultiModeInit = -1;
@@ -611,6 +613,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gDemo.Close();
     netWaitForEveryone(0);
     VanillaModeUpdate();
+    r_mirrormodelock = 0;
     if (gGameOptions.nGameType == kGameTypeSinglePlayer)
     {
         if (!(gGameOptions.uGameFlags&kGameFlagContinuing))
@@ -674,7 +677,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nSpawnProtection = gPacketStartGame.nSpawnProtection;
         gGameOptions.nSpawnWeapon = gPacketStartGame.nSpawnWeapon;
         if (gPacketStartGame.userMap)
-            levelAddUserMap(gPacketStartGame.userMapName);
+            levelAddUserMap(gNetMapOverride[0] != '\0' ? gNetMapOverride : gPacketStartGame.userMapName);
         else
             levelSetupOptions(gGameOptions.nEpisode, gGameOptions.nLevel);
 
@@ -710,6 +713,12 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gRedFlagDropped = false;
         gView = gMe;
         gViewIndex = myconnectindex;
+        r_mirrormodelock = 1;
+        r_mirrormode = 0;
+        if (gGameOptions.uNetGameFlags&kNetGameFlagMirrorHoriz)
+            r_mirrormode |= 1;
+        if (gGameOptions.uNetGameFlags&kNetGameFlagMirrorVert)
+            r_mirrormode |= 2;
     }
     if (gameOptions->uGameFlags&kGameFlagContinuing) // if episode is in progress, remember player stats
     {
@@ -749,7 +758,10 @@ void StartLevel(GAMEOPTIONS *gameOptions)
                 DeleteSprite(i);
                 continue;
             }
-
+            if ((gGameOptions.uNetGameFlags&kNetGameFlagNoTeamFlags) && (pSprite->type == kItemFlagABase || pSprite->type == kItemFlagBBase || pSprite->type == kItemFlagA || pSprite->type == kItemFlagB)) {
+                DeleteSprite(i);
+                continue;
+            }
             
             #ifdef NOONE_EXTENSIONS
             if (!gModernMap && nnExtEraseModernStuff(pSprite, pXSprite))
@@ -929,7 +941,7 @@ void StartNetworkLevel(void)
         gGameOptions.nSpawnProtection = gPacketStartGame.nSpawnProtection;
         gGameOptions.nSpawnWeapon = gPacketStartGame.nSpawnWeapon;
         if (gPacketStartGame.userMap)
-            levelAddUserMap(gPacketStartGame.userMapName);
+            levelAddUserMap(gNetMapOverride[0] != '\0' ? gNetMapOverride : gPacketStartGame.userMapName);
         else
             levelSetupOptions(gGameOptions.nEpisode, gGameOptions.nLevel);
         
@@ -1052,6 +1064,8 @@ void LocalKeys(void)
     if (gDoQuickSave)
     {
         keyFlushScans();
+        CONTROL_ClearButton(gamefunc_Quick_Save);
+        CONTROL_ClearButton(gamefunc_Quick_Load);
         if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gGameOptions.bPermaDeath && !gDemo.bPlaying && !gDemo.bRecording) // if not in multiplayer session and not in demo playback, allow quicksave
         {
             switch (gDoQuickSave)
@@ -1069,6 +1083,20 @@ void LocalKeys(void)
         }
         gDoQuickSave = 0;
         return;
+    }
+    if (BUTTON(gamefunc_Quick_Save))
+    {
+        keyFlushScans();
+        CONTROL_ClearButton(gamefunc_Quick_Save);
+        if (gGameOptions.nGameType == kGameTypeSinglePlayer)
+            return DoQuickSave();
+    }
+    if (BUTTON(gamefunc_Quick_Load))
+    {
+        keyFlushScans();
+        CONTROL_ClearButton(gamefunc_Quick_Load);
+        if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gGameOptions.bPermaDeath)
+            return DoQuickLoad();
     }
     char key;
     if ((key = keyGetScan()) != 0)
@@ -1090,9 +1118,9 @@ void LocalKeys(void)
             CONTROL_ClearButton(gamefunc_See_Chase_View);
             return;
         }
-        else if (alt && (gGameOptions.nGameType != kGameTypeSinglePlayer) && (key == sc_F11) && !VanillaMode()) // secret fart hotkey
+        else if (alt && (gGameOptions.nGameType != kGameTypeSinglePlayer) && (key == sc_F11) && !VanillaMode()) // secret cultist speak hotkey
         {
-            netBroadcastFart(myconnectindex);
+            netBroadcastTauntRandom(myconnectindex);
             keyFlushScans();
             keystatus[key] = 0;
             return;
@@ -1372,7 +1400,7 @@ SWITCH switches[] = {
     { "broadcast", 1, 0 },
     { "map", 2, 1 },
     { "masterslave", 3, 0 },
-    //{ "net", 4, 1 },
+    { "level", 4, 2 },
     { "nodudes", 5, 1 },
     { "playback", 6, 1 },
     { "record", 7, 1 },
@@ -1427,8 +1455,9 @@ SWITCH switches[] = {
     { "mp_weaps", 51, 1 },
     { "mp_items", 52, 1 },
     { "mp_map", 53, 1 },
-    { "netretry", 54, 0 },
-    { "clientport", 55, 1 },
+    { "mp_mapclient", 54, 1 },
+    { "netretry", 55, 0 },
+    { "clientport", 56, 1 },
     { NULL, 0, 0 }
 };
 
@@ -1450,6 +1479,7 @@ void PrintHelp(void)
         "-ini [file.ini]\tSpecify an INI file name (default is blood.ini)\n"
         "-j [dir]\t\tAdd a directory to " APPNAME "'s search list\n"
         "-map [file.map]\tLoad an external map file\n"
+        "-level [E M]\tLoad an internal map (e.g: 1 3)\n"
         "-mh [file.def]\tInclude an additional definitions module\n"
         "-noautoload\tDisable loading from autoload directory\n"
         "-nodemo\t\tNo Demos\n"
@@ -1480,6 +1510,7 @@ void PrintHelp(void)
         "-mp_weaps [0-3]\tSet weapon settings for multiplayer (0: don't respawn, 1: permanent, 2: respawn, 3: respawn with markers)\n"
         "-mp_items [0-2]\tSet item settings for multiplayer (0: don't respawn, 1: respawn, 2: respawn with markers)\n"
         "-mp_map [map]\tSet user map path for multiplayer (e.g: filename.map)\n"
+        "-mp_mapclient [map]\tOverride user map for multiplayer clients (e.g: filename.map)\n"
         "-netretry\t\tReattempts client connection automatically (hold down escape to end loop)\n"
         "-clientport\tSets the local port used for network binding for clients\n"
         ;
@@ -1579,10 +1610,12 @@ void ParseOptions(void)
             gPacketMode = PACKETMODE_2;
             break;
         case 4:
-            //if (OptArgc < 1)
-            //    ThrowError("Missing argument");
-            //if (gGameOptions.nGameType == kGameTypeSinglePlayer)
-            //    gGameOptions.nGameType = kGameTypeBloodBath;
+            if (OptArgc < 2)
+                ThrowError("Missing argument");
+            bUseInternalE = ClipRange(atoi(OptArgv[0]), 1, kMaxEpisodes)-1;
+            bUseInternalL = ClipRange(atoi(OptArgv[1]), 1, kMaxLevels)-1;
+            bUseInternalMap = 1;
+            bNoDemo = 1;
             break;
         case 30:
             if (OptArgc < 1)
@@ -1818,10 +1851,15 @@ void ParseOptions(void)
                 ThrowError("Missing argument");
             Bstrncpyz(zUserMapName, OptArgv[0], sizeof(zUserMapName));
             break;
-        case 54: // netretry
+        case 54: // mp_mapclient
+            if (OptArgc < 1)
+                ThrowError("Missing argument");
+            Bstrncpyz(gNetMapOverride, OptArgv[0], sizeof(gNetMapOverride));
+            break;
+        case 55: // netretry
             gNetRetry = true;
             break;
-        case 55: // clientport
+        case 56: // clientport
             gNetPortLocal = strtoul(OptArgv[0], NULL, 0);
             break;
         }
@@ -2152,6 +2190,13 @@ int app_main(int argc, char const * const * argv)
         levelAddUserMap(gUserMapFilename);
         gStartNewGame = 1;
     }
+    if (bUseInternalMap)
+    {
+        bUseInternalE = ClipRange(bUseInternalE, 0, gEpisodeCount-1);
+        bUseInternalL = ClipRange(bUseInternalL, 0, gEpisodeInfo[bUseInternalE].nLevels-1);
+        levelSetupOptions(bUseInternalE, bUseInternalL);
+        levelRestart();
+    }
     SetupMenus();
     videoSetViewableArea(0, 0, xdim - 1, ydim - 1);
 
@@ -2189,11 +2234,11 @@ RESTART:
         KB_FlushKeyboardQueue();
         keyFlushScans();
     }
-    else if (gDemo.bPlaying && !bAddUserMap && !bNoDemo)
+    else if (gDemo.bPlaying && !bAddUserMap && !bUseInternalMap && !bNoDemo)
         gDemo.Playback();
     if (gDemo.nDemosFound > 0)
         gGameMenuMgr.Deactivate();
-    if (!bAddUserMap && !gGameStarted)
+    if (!bAddUserMap && !bUseInternalMap && !gGameStarted)
     {
         gGameMenuMgr.Push(&menuMain, -1);
         if (gGameOptions.nGameType != kGameTypeSinglePlayer)

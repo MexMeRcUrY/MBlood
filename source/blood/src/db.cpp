@@ -30,14 +30,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "crc32.h"
 #include "md4.h"
 
-//#include "actor.h"
+#include "actor.h"
+#include "config.h"
 #include "globals.h"
+#include "blood.h"
 #include "db.h"
 #include "iob.h"
 #include "eventq.h"
-#include "actor.h"
-#include "config.h"
-#include "gameutil.h"
+#include "levels.h"
 #ifdef NOONE_EXTENSIONS
 #include "nnexts.h"
 #include "view.h"
@@ -770,19 +770,19 @@ static uint32_t curRandomizerSeedThings = 0;
 inline int dbRandomizerRNG(const int range)
 {
     curRandomizerSeed = (214013 * curRandomizerSeed + 2531011);
-    return mulscale(((curRandomizerSeed >> 16) & 0x7FFF), range, 15);
+    return mulscale15(((curRandomizerSeed >> 16) & 0x7FFF), range);
 }
 
 inline int dbRandomizerRNGDudes(const int range)
 {
     curRandomizerSeedDudes = (214013 * curRandomizerSeedDudes + 2531011);
-    return mulscale(((curRandomizerSeedDudes >> 16) & 0x7FFF), range, 15);
+    return mulscale15(((curRandomizerSeedDudes >> 16) & 0x7FFF), range);
 }
 
 inline int dbRandomizerRNGThings(const int range)
 {
     curRandomizerSeedThings = (214013 * curRandomizerSeedThings + 2531011);
-    return mulscale(((curRandomizerSeedThings >> 16) & 0x7FFF), range, 15);
+    return mulscale15(((curRandomizerSeedThings >> 16) & 0x7FFF), range);
 }
 
 void dbRandomizerModeInit(void)

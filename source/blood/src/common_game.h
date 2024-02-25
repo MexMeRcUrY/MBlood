@@ -160,6 +160,10 @@ kNetGameFlagLimitMask           =  1 << 8|1 << 9|1 << 10|1 << 11|1 << 12|1 << 13
 
 kNetGameFlagSpawnSmart          =  1 << 16,
 kNetGameFlagSpawnDist           =  1 << 17,
+kNetGameFlagNoTeamFlags         =  1 << 18,
+kNetGameFlagMirrorHoriz         =  1 << 19,
+kNetGameFlagMirrorVert          =  1 << 20,
+kNetGameFlagCalebOnly           =  1 << 21, // no items, caleb only, final destination
 
 };
 
@@ -803,7 +807,8 @@ inline float ClipRangeF(float a, float b, float c)
 inline int interpolate(int a, int b, int c, char bOrigCal = 0)
 {
     extern bool VanillaMode(const bool bDemoCheck = false);
-    if (bOrigCal || VanillaMode())
+    extern int32_t gViewInterpolateMethod;
+    if (bOrigCal || !gViewInterpolateMethod || VanillaMode())
         return a+mulscale16(b-a,c);
     if (a == b)
         return b;
