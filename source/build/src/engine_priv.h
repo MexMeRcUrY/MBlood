@@ -182,6 +182,7 @@ extern int32_t globvis2, globalvisibility2, globalhisibility2, globalpisibility2
 extern int32_t globvis, globalvisibility;
 extern int32_t xyaspect;
 extern int32_t globalshade;
+extern int32_t globalclipdist;
 extern int16_t globalpicnum;
 
 extern int32_t globalorientation;
@@ -195,7 +196,6 @@ extern int16_t searchbottomwall, searchisbottom;
 
 extern char inpreparemirror;
 
-extern uint8_t tilefilenum[MAXTILES];
 extern char picsiz[MAXTILES];
 extern int16_t sectorborder[256];
 extern int32_t qsetmode;
@@ -269,7 +269,7 @@ static FORCE_INLINE int32_t yax_isislandwall(int32_t line, int32_t cf) { return 
 extern char m32_debugstr[64][128];
 extern int32_t m32_numdebuglines;
 # define yaxdebug(fmt, ...)  do { if (m32_numdebuglines<64) Bsnprintf(m32_debugstr[m32_numdebuglines++], 128, fmt, ##__VA_ARGS__); } while (0)
-# define yaxprintf(fmt, ...) do { initprintf(fmt, ##__VA_ARGS__); } while (0)
+# define yaxprintf(fmt, ...) do { LOG_F(INFO, fmt, ##__VA_ARGS__); } while (0)
 #else
 # define yaxdebug(fmt, ...)
 # define yaxprintf(fmt, ...)
@@ -456,7 +456,7 @@ static inline floorsprite_dims get_floorspr_dims(uspriteptr_t spr, bool sloped)
 static inline vec2_t get_floorspr_center(void const *const ptr, bool sloped)
 {
     auto const *spr = (uspriteptr_t)ptr;
-    Bassert((spr->cstat & CSTAT_SPRITE_ALIGNMENT) == CSTAT_SPRITE_ALIGNMENT_FLOOR);
+    Bassert((spr->cstat & CSTAT_SPRITE_ALIGNMENT) == (sloped ? CSTAT_SPRITE_ALIGNMENT_SLOPE : CSTAT_SPRITE_ALIGNMENT_FLOOR));
 
     auto const    dims   = get_floorspr_dims(spr, sloped);
     int32_t const cosang = dims.cosang, sinang = dims.sinang;
@@ -495,5 +495,7 @@ static inline void get_floorspr_points(void const * const ptr, int32_t px, int32
     *x3 = *x2 + ofs.x, *x4 = *x1 + ofs.x;
     *y3 = *y2 + ofs.y, *y4 = *y1 + ofs.y;
 }
+
+void getclosestpointonline(vec2_t const p, vec2_t w, vec2_t w2, vec2_t* const closest);
 
 #endif	/* ENGINE_PRIV_H */

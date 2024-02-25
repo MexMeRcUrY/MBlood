@@ -1415,7 +1415,7 @@ void nnExtInitModernStuff(bool bSaveLoad) {
 
         char modDir[BMAX_PATH] = "./";
         if (g_modDir[0] != '/' || g_modDir[1] != 0)
-            Bsprintf(modDir, g_modDir);
+            strcpy(modDir, g_modDir);
 
         i = nnExtResAddExternalFiles(&gSysRes, modDir, gExternFiles, LENGTH(gExternFiles));
         consoleSysMsg("There is %d extra external files added in total.", i);
@@ -1609,7 +1609,7 @@ int getSpriteMassBySize(spritetype* pSprite) {
     short xrepeat = pSprite->xrepeat; 	short yrepeat = pSprite->yrepeat;
 
     // take surface type into account
-    switch (tileGetSurfType(pSprite->index + 0xc000)) {
+    switch (tileGetSurfType(pSprite->index, 0xc000)) {
         case 1:  massDiv = 16; break; // stone
         case 2:  massDiv = 18; break; // metal
         case 3:  massDiv = 21; break; // wood
@@ -8236,14 +8236,12 @@ void nnExtLoadSave::Load(void)
 
 void nnExtLoadSave::Save(void)
 {
-    int i;
-    char tmp[32];
     if (!gModernMap)
         return;
 
-    i = Bsprintf(tmp, nnExtBlkSign[0]); Write(tmp, i);
+    Write(nnExtBlkSign[0], strlen(nnExtBlkSign[0]));
     gSprNSect.Save(this); // save sprites near walls
-    i = Bsprintf(tmp, nnExtBlkSign[1]); Write(tmp, i);
+    Write(nnExtBlkSign[1], strlen(nnExtBlkSign[1]));
 }
 
 static nnExtLoadSave* myLoadSave;

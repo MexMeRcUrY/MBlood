@@ -2501,10 +2501,10 @@ void actInit(bool bSaveLoad) {
 
     #ifdef NOONE_EXTENSIONS
     if (!gModernMap) {
-        initprintf("> This map *does not* provide modern features.\n");
+        LOG_F(INFO, "> This map *does not* provide modern features.");
         nnExtResetGlobals();
     } else {
-        initprintf("> This map provides modern features.\n");
+        LOG_F(INFO, "> This map provides modern features.");
         nnExtInitModernStuff(bSaveLoad);
     }
     #endif
@@ -3505,7 +3505,7 @@ int actDamageSprite(int nSource, spritetype *pSprite, DAMAGE_TYPE damageType, in
 
             }
 
-            if (gSoundDing && (pSourcePlayer == gMe) && (pSprite != gMe->pSprite) && (damage > 0) && bWasAlive) {
+            if (gSoundDing && (pSourcePlayer == gMe) && gMe && (pSprite != gMe->pSprite) && (damage > 0) && bWasAlive) {
                 for (int i = 0; i < 4; i++) {
                     DMGFEEDBACK *pSoundDmgSprite = &gSoundDingSprite[i];
                     if (pSoundDmgSprite->nSprite == -1) {
@@ -4028,7 +4028,7 @@ void actTouchFloor(spritetype *pSprite, int nSector)
             nDamage = 1000;
         actDamageSprite(pSprite->index, pSprite, nDamageType, scale(4, nDamage, 120) << 4);
     }
-    if (tileGetSurfType(nSector + 0x4000) == kSurfLava)
+    if (tileGetSurfType(nSector, 0x4000) == kSurfLava)
     {
         actDamageSprite(pSprite->index, pSprite, kDamageBurn, 16);
         sfxPlay3DSound(pSprite, 352, 5, 2);
@@ -4901,6 +4901,12 @@ void MoveDude(spritetype *pSprite)
                     case kDudeBoneEel:
                         actKillDude(pSprite->index, pSprite, kDamageFall, 1000<<4);
                         break;
+                    case kDudeBeast:
+                        if (!EnemiesNotBlood() || VanillaMode())
+                            break;
+                        aiNewState(pSprite, pXSprite, &beastGoto);
+                        pSprite->flags |= 6;
+                        break;
                 }
 
                 #ifdef NOONE_EXTENSIONS
@@ -4993,6 +4999,14 @@ void MoveDude(spritetype *pSprite)
                 case kDudeRat:
                 case kDudeBurningInnocent:
                     actKillDude(pSprite->index, pSprite, kDamageFall, 1000 << 4);
+                    break;
+                case kDudeBeast:
+                    if (!EnemiesNotBlood() || VanillaMode())
+                        break;
+                    pXSprite->burnTime = 0;
+                    sfxPlay3DSound(pSprite, 720, -1, 0);
+                    aiNewState(pSprite, pXSprite, &beastSwimGoto);
+                    pSprite->flags &= ~6;
                     break;
                 }
 
@@ -5592,9 +5606,12 @@ static bool MoveMissileBulletVectorTest(spritetype *pSource, spritetype *pShoote
                 if (t > 0 && pVectorData->impulse)
                 {
                     int t2 = divscale8(pVectorData->impulse, t);
+                    int t3 = mulscale16(a6, t2);
+                    if (EnemiesNotBlood() && !VanillaMode()) // clamp downward impulse damage to stop players from cheesing bosses
+                        t3 = ClipHigh(t3, 32767);
                     xvel[nSprite] += mulscale16(a4, t2) * boost;
                     yvel[nSprite] += mulscale16(a5, t2) * boost;
-                    zvel[nSprite] += mulscale16(a6, t2) * boostz;
+                    zvel[nSprite] += t3 * boostz;
                 }
                 if (pVectorData->burnTime)
                 {
@@ -5745,8 +5762,10 @@ void MoveMissileBullet(spritetype *pSprite)
     int dz = zvel[nSprite]>>7;
     const VECTOR_TYPE nType = pSprite->type == kMissileShell ? kVectorShell : kVectorBullet;
     int speed = missileInfo[pSprite->type - kMissileBase].velocity;
-    if (gGameOptions.nDifficulty < 3) // if on lower difficulties, adjust hitscan range by 75%
+    if (gGameOptions.nHitscanProjectiles == 1) // if hitscan projectile speed is 75%, adjust hitscan range
         speed = (speed>>1) + (speed>>2);
+    else if (gGameOptions.nHitscanProjectiles == 3) // if hitscan projectile speed is 125%, adjust hitscan range
+        speed += (speed>>2);
     if (bulletIsUnderwater) // if bullet is underwater, adjust hitscan range by 75%
         speed = (speed>>1) + (speed>>2);
     bool weHitSomething = MoveMissileBulletVectorTest(pSprite, pOwner, 0, 0, dx, dy, dz, nType, (speed>>12) + (speed>>13));
@@ -6099,9 +6118,10 @@ void actProcessSprites(void)
 
                             switch (pSprite->type) {
                                 case kThingDroppedLifeLeech:
-                                    if (!Chance(0x4000) && nNextSprite >= 0) continue;
-                                    if (pSprite2->cstat & CLIPMASK0) pXSprite->target = pSprite2->index;
-                                    else continue;
+                                    if ((Chance(0x4000) || nNextSprite < 0) && (pSprite2->cstat & CLIPMASK0))
+                                        pXSprite->target = pSprite2->index;
+                                    else
+                                        continue;
                                     break;
                                 #ifdef NOONE_EXTENSIONS
                                 case kModernThingTNTProx:
@@ -7049,11 +7069,17 @@ spritetype* actFireMissile(spritetype *pSprite, int a2, int a3, int a4, int a5, 
         pMissile->cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
         if (gTransparentHitscanProjectiles)
             pMissile->cstat |= CSTAT_SPRITE_TRANSLUCENT;
-        if (gGameOptions.nDifficulty < 3) // slow down by 75% if on lower difficulties
+        if (gGameOptions.nHitscanProjectiles == 1) // if hitscan projectile speed is 75%, adjust speed
         {
             xvel[nMissile] = (xvel[nMissile]>>1) + (xvel[nMissile]>>2);
             yvel[nMissile] = (yvel[nMissile]>>1) + (yvel[nMissile]>>2);
             zvel[nMissile] = (zvel[nMissile]>>1) + (zvel[nMissile]>>2);
+        }
+        else if (gGameOptions.nHitscanProjectiles == 3) // if hitscan projectile speed is 125%, adjust speed
+        {
+            xvel[nMissile] += (xvel[nMissile]>>2);
+            yvel[nMissile] += (yvel[nMissile]>>2);
+            zvel[nMissile] += (zvel[nMissile]>>2);
         }
     }
     int nXSprite = pMissile->extra;
@@ -7448,9 +7474,12 @@ void actFireVector(spritetype *pShooter, int a2, int a3, int a4, int a5, int a6,
                 if (t > 0 && pVectorData->impulse)
                 {
                     int t2 = divscale8(pVectorData->impulse, t);
+                    int t3 = mulscale16(a6, t2);
+                    if (EnemiesNotBlood() && !VanillaMode()) // clamp downward impulse damage to stop players from cheesing bosses
+                        t3 = ClipHigh(t3, 32767);
                     xvel[nSprite] += mulscale16(a4, t2) * boost * invertVal;
                     yvel[nSprite] += mulscale16(a5, t2) * boost * invertVal;
-                    zvel[nSprite] += mulscale16(a6, t2) * boostz * invertVal;
+                    zvel[nSprite] += t3 * boostz * invertVal;
                 }
                 if (pVectorData->burnTime)
                 {

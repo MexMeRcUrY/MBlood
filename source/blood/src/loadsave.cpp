@@ -73,7 +73,7 @@ void LoadSave::Read(void *pData, int nSize)
         ThrowError("Error reading save file.");
 }
 
-void LoadSave::Write(void *pData, int nSize)
+void LoadSave::Write(void const *pData, int nSize)
 {
     dassert(hSFile != NULL);
     if (fwrite(pData, 1, nSize, hSFile) != (size_t)nSize)
@@ -237,7 +237,7 @@ void LoadSave::LoadGame(char *pzFile)
         gGameOptions.bEnemyRandomTNT = gEnemyRandomTNT;
         gGameOptions.nWeaponsVer = gWeaponsVer;
         gGameOptions.bSectorBehavior = gSectorBehavior;
-        gGameOptions.bHitscanProjectiles = gHitscanProjectiles;
+        gGameOptions.nHitscanProjectiles = gHitscanProjectiles;
         gGameOptions.nRandomizerMode = gRandomizerMode;
         Bmemcpy(gGameOptions.szRandomizerSeed, gzRandomizerSeed, sizeof(gGameOptions.szRandomizerSeed));
     }
@@ -523,7 +523,7 @@ void LoadSavedInfo(void)
             kclose(hFile);
             continue;
         }
-        nSlot = ((pIterator->name[nSlot-nNameMin] - '0') * 10) + (pIterator->name[nSlot-(nNameMin+1)] - '0');
+        nSlot = Batoi(&pIterator->name[nSlot-nNameMin]);
         if (nSlot > kLoadSaveSlot10) // slot id too big, skip
         {
             kclose(hFile);
@@ -572,8 +572,8 @@ void LoadAutosavedInfo(void)
             kclose(hFile);
             continue;
         }
-        nSlot = kLoadSaveSlotAutosave + (pIterator->name[nSlot-nNameMin] - '0');
-        if (nSlot > kLoadSaveSlotKey) // slot id too big, skip
+        nSlot = kLoadSaveSlotAutosave + Batoi(&pIterator->name[nSlot-nNameMin]);
+        if (nSlot < kLoadSaveSlotAutosave || nSlot > kLoadSaveSlotKey) // slot id too small/big, skip
         {
             kclose(hFile);
             continue;

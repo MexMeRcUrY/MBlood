@@ -918,7 +918,7 @@ void playerStart(int nPlayer, int bNewLevel)
     // this is used to safely update profiles while in a network multiplayer session, for example...
     // if a player updated their autoaim settings while facing an enemy, it would cause a game desync thanks to the autoaim target changing for local player before the gProfile update packet has been sent to the other clients
     // by tunneling all mid-session gProfile updates to gProfileNet it'll allow all clients to update the current player's settings at the same tick, which is on spawn (this ensures everybody stays synced)
-    if ((numplayers > 1) && (gGameOptions.nGameType != kGameTypeSinglePlayer))
+    if ((numplayers > 1) || (gGameOptions.nGameType != kGameTypeSinglePlayer))
         gProfile[nPlayer] = gProfileNet[nPlayer];
 
     playerResetTeamId(nPlayer, bNewLevel);
@@ -955,7 +955,7 @@ void playerStart(int nPlayer, int bNewLevel)
     #endif
     else {
         int zoneId = Random(kMaxPlayers);
-        if ((gGameOptions.nGameType >= kGameTypeBloodBath) && !VanillaMode()) { // search for a safe random spawn for bloodbath/teams mode
+        if ((gGameOptions.nGameType >= kGameTypeBloodBath) && (gGameOptions.uNetGameFlags&kNetGameFlagSpawnSmart)) { // search for a safe random spawn for bloodbath/teams mode
             const int nSearchList = zoneId;
             for (int nZone = 0; nZone < kMaxPlayers; nZone++) {
                 pStartZone = &gStartZone[nZoneRandList[nSearchList][nZone]];
@@ -965,20 +965,20 @@ void playerStart(int nPlayer, int bNewLevel)
                         continue;
                     if (!sectRangeIsFine(gPlayer[i].pSprite->sectnum)) // invalid sector, skip
                         continue;
-                    const bool activeEnemy = (gPlayer[i].pXSprite->health > 0) && !IsTargetTeammate(pPlayer, gPlayer[i].pSprite);
-                    if ((i == nPlayer) && !activeEnemy) // only check our current location or that of an alive/enemy player, otherwise skip
+                    const char bActiveEnemy = (gPlayer[i].pXSprite->health > 0) && !IsTargetTeammate(pPlayer, gPlayer[i].pSprite);
+                    if ((i != nPlayer) && !bActiveEnemy) // only check our current location or that of an alive/enemy player, otherwise skip
                         continue;
                     const int nDist = approxDist3D(pStartZone->x-gPlayer[i].pSprite->x, pStartZone->y-gPlayer[i].pSprite->y, pStartZone->z-gPlayer[i].pSprite->z);
-                    if (nDist < 32*5) // if within 5 meters of each other
+                    if (nDist < 32*10) // if within 10 meters of each other
                     {
                         bSpawnTooClose = true;
                         break;
                     }
-                    const vec3_t startpos = {pStartZone->x, pStartZone->y, getflorzofslope(pStartZone->sectnum, pStartZone->x, pStartZone->y) - (32<<8)}; // get start/enemy position (and offset by 1 meter from floor)
-                    const vec3_t enemypos = {gPlayer[i].pSprite->x, gPlayer[i].pSprite->y, gPlayer[i].pSprite->z - (32<<8)};
+                    const vec3_t startpos = {pStartZone->x, pStartZone->y, pStartZone->z}; // get start/enemy position (and offset by 1 meter from floor)
+                    const vec3_t enemypos = {gPlayer[i].pSprite->x, gPlayer[i].pSprite->y, gPlayer[i].zView};
                     if (cansee(startpos.x, startpos.y, startpos.z, pStartZone->sectnum, enemypos.x, enemypos.y, enemypos.z, gPlayer[i].pSprite->sectnum)) // this spawn is in viewable range of another player/self, stop checking rest of players
                     {
-                        if (nDist < 32*12) // if within 12 meters of each other
+                        if (nDist < 32*20) // if within 20 meters of each other
                         {
                             bSpawnTooClose = true;
                             break;
@@ -989,6 +989,30 @@ void playerStart(int nPlayer, int bNewLevel)
                 {
                     zoneId = nZoneRandList[nSearchList][nZone];
                     break;
+                }
+            }
+        }
+        else if ((gGameOptions.nGameType >= kGameTypeBloodBath) && (gGameOptions.uNetGameFlags&kNetGameFlagSpawnDist)) { // get farthest spawn location
+            int nZoneDist[kMaxPlayers] = {0};
+            for (int nZone = 0; nZone < kMaxPlayers; nZone++) {
+                pStartZone = &gStartZone[nZone];
+                for (int i = connecthead; i >= 0; i = connectpoint2[i]) { // check every connected player
+                    if (!gPlayer[i].pSprite || !gPlayer[i].pXSprite) // invalid player, skip
+                        continue;
+                    if (!sectRangeIsFine(gPlayer[i].pSprite->sectnum)) // invalid sector, skip
+                        continue;
+                    const char bActiveEnemy = (gPlayer[i].pXSprite->health > 0) && !IsTargetTeammate(pPlayer, gPlayer[i].pSprite);
+                    if ((i != nPlayer) && !bActiveEnemy) // only check our current location or that of an alive/enemy player, otherwise skip
+                        continue;
+                    const int nDist = approxDist(pStartZone->x-gPlayer[i].pSprite->x, pStartZone->y-gPlayer[i].pSprite->y);
+                    if (nDist > nZoneDist[nZone])
+                        nZoneDist[nZone] = nDist;
+                }
+            }
+            for (int nZone = 0, nDist = 0; nZone < kMaxPlayers; nZone++) {
+                if (nDist < nZoneDist[nZone]) {
+                    nDist = nZoneDist[nZone];
+                    zoneId = nZone;
                 }
             }
         }
@@ -1364,6 +1388,7 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
         return 0;
         case kItemFlagA: {
             if (gGameOptions.nGameType != kGameTypeTeams) return 0;
+            evKill(pItem->index, 3, kCallbackReturnFlag);
             gBlueFlagDropped = false;
             pPlayer->hasFlag |= 1;
             pPlayer->used2[0] = pItem->owner;
@@ -1379,6 +1404,7 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
         }
         case kItemFlagB: {
             if (gGameOptions.nGameType != kGameTypeTeams) return 0;
+            evKill(pItem->index, 3, kCallbackReturnFlag);
             gRedFlagDropped = false;
             pPlayer->hasFlag |= 2;
             pPlayer->used2[1] = pItem->owner;
@@ -1437,8 +1463,9 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
                     gPlayer[i].hasKey[pItem->type-99] = 1;
                 }
                 if (pPlayer != gMe) { // display message if network player collected key
-                    sprintf(buffer, "%s picked up %s", gProfile[pPlayer->nPlayer].name, gItemText[pItem->type - kItemBase]);
-                    viewSetMessage(buffer, 0, MESSAGE_PRIORITY_PICKUP);
+                    sprintf(buffer, "\r%s\r picked up %s", gProfile[pPlayer->nPlayer].name, gItemText[pItem->type - kItemBase]);
+                    const int nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(pPlayer->teamId) : 0;
+                    viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_PICKUP, nPal);
                 }
             }
             break;
@@ -2264,7 +2291,7 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
         {
             pKiller->fragCount--;
             pKiller->fragInfo[nKiller]--;
-            gMultiKillsFrags[nVictim] = 0; // reset multi kill counter
+            gMultiKillsFrags[nKiller] = 0; // reset multi kill counter
         }
         if (gGameOptions.nGameType == kGameTypeTeams)
             gPlayerScores[pKiller->teamId]--;
@@ -2289,7 +2316,7 @@ void playerFrag(PLAYER *pKiller, PLAYER *pVictim)
         if (VanillaMode() || gGameOptions.nGameType != kGameTypeCoop)
         {
             pKiller->fragCount++;
-            pKiller->fragInfo[nKiller]++;
+            pKiller->fragInfo[nVictim]++;
             gMultiKillsFrags[nVictim] = 0;
             if (gKillMsg) // calculate kill message notification
             {
@@ -2394,19 +2421,12 @@ void FragPlayer(PLAYER *pPlayer, int nSprite)
 void playerInitRoundCheck(void)
 {
     gPlayerRoundLimit = gPlayerRoundEnding = 0;
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit5)
-        gPlayerRoundLimit += 5;
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit10)
-        gPlayerRoundLimit += 10;
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit20)
-        gPlayerRoundLimit += 20;
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit50)
-        gPlayerRoundLimit += 50;
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimit100)
-        gPlayerRoundLimit += 100;
-
-    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // convert to minutes
-        gPlayerRoundLimit *= kTicsPerSec*60;
+    if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMask)
+    {
+        gPlayerRoundLimit = (gGameOptions.uNetGameFlags&kNetGameFlagLimitMask)>>kNetGameFlagLimitBase;
+        if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // convert to minutes
+            gPlayerRoundLimit *= kTicsPerSec*60;
+    }
 }
 
 void playerProcessRoundCheck(void)
@@ -2422,42 +2442,63 @@ void playerProcessRoundCheck(void)
             return;
     }
 
-    int nScore = INT_MIN, nWinner = 0;
-    if (gGameOptions.nGameType == kGameTypeBloodBath)
+    int nWinner = 0, nWinners = 0;
+    int nScore[kMaxPlayers], nScoreMax = INT_MIN;
+    for (int i = 0; i < kMaxPlayers; i++)
+        nScore[i] = INT_MIN;
+
+    if (gGameOptions.nGameType == kGameTypeBloodBath) // count scores and check for ties
     {
         for (int p = connecthead; p >= 0; p = connectpoint2[p])
         {
-            if (nScore < gPlayer[p].fragCount)
-                nScore = gPlayer[p].fragCount, nWinner = p;
+            nScore[p] = gPlayer[p].fragCount;
+            if (nScoreMax < nScore[p])
+                nScoreMax = nScore[p], nWinner = p;
+        }
+        for (int p = connecthead; p >= 0; p = connectpoint2[p])
+        {
+            if (nScoreMax == nScore[p])
+                nWinners++;
         }
     }
     else if (gGameOptions.nGameType == kGameTypeTeams)
     {
         for (int i = 0; i < 2; i++)
         {
-            if (nScore < gPlayerScores[i])
-                nScore = gPlayerScores[i], nWinner = i;
+            nScore[i] = gPlayerScores[i];
+            if (nScoreMax < nScore[i])
+                nScoreMax = nScore[i], nWinner = i;
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            if (nScoreMax == nScore[i])
+                nWinners++;
         }
     }
 
-    if ((gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) || (nScore >= gPlayerRoundLimit))
+    if ((gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags) && (nScoreMax < gPlayerRoundLimit))
+        return;
+
+    char buffer[80] = "Ending round...";
+    int nPal = 0;
+    if (nWinners > 1) // if there is more than one winner, count as tie
     {
-        char buffer[80] = "Ending round...";
-        int nPal = 0;
-        if (gGameOptions.nGameType == kGameTypeBloodBath)
-        {
-            sprintf(buffer, "\r%s\r is the winner", gProfile[nWinner].name);
-            nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(gPlayer[nWinner].teamId) : 0;
-        }
-        else if (gGameOptions.nGameType == kGameTypeTeams)
-        {
-            sprintf(buffer, "\r%s\r is the winner", nWinner ? "Red Team" : "Blue Team");
-            nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(nWinner) : 0;
-        }
-        viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal);
-        evPost(kLevelExitNormal, 3, kTicRate * 5, kCallbackEndLevel); // trigger level end in five seconds
-        gPlayerRoundEnding = 1;
+        sprintf(buffer, "It's a tie of %d! Ending round...", nWinners);
     }
+    else if (gGameOptions.nGameType == kGameTypeBloodBath)
+    {
+        sprintf(buffer, "\r%s\r is the winner!", gProfile[nWinner].name);
+        nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(gPlayer[nWinner].teamId) : 0;
+    }
+    else if (gGameOptions.nGameType == kGameTypeTeams)
+    {
+        sprintf(buffer, "\r%s\r is the winner!", nWinner ? "Red Team" : "Blue Team");
+        nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(nWinner) : 0;
+    }
+    viewDrawWinner(buffer, nPal);
+    viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal);
+    evPost(kLevelExitNormal, 3, kTicRate * 5, kCallbackEndRound); // trigger level end in 5 seconds
+    gPlayerRoundEnding = 1;
 }
 
 int playerDamageArmor(PLAYER *pPlayer, DAMAGE_TYPE nType, int nDamage)

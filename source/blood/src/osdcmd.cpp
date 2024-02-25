@@ -310,7 +310,7 @@ static int osdcmd_vidmode(osdcmdptr_t parm)
 
     if (videoSetGameMode(newfs,newwidth,newheight,newbpp,upscalefactor))
     {
-        initprintf("vidmode: Mode change failed!\n");
+        LOG_F(ERROR, "vidmode: Mode change failed!");
         if (videoSetGameMode(gSetup.fullscreen, gSetup.xdim, gSetup.ydim, gSetup.bpp, upscalefactor))
             ThrowError("vidmode: Reset failed!\n");
     }
@@ -1000,6 +1000,8 @@ int32_t registerosdcommands(void)
         { "cl_interpolatepanning", "enable/disable sector texture panning interpolation (cl_interpolate must be set on)", (void *)&gPanningInterpolate, CVAR_BOOL, 0, 1 },
         { "cl_interpolateweapon", "enable/disable view interpolation for drawn weapon (0: disable, 1: position, 2: position/qav animation)", (void *)&gWeaponInterpolate, CVAR_INT, 0, 2 },
         { "cl_colormsg", "enable/disable colored player names in messages", (void *)&gColorMsg, CVAR_BOOL, 0, 1 },
+        { "cl_dim", "enable/disable dimming background when menu is active", (void *)&gViewDim, CVAR_BOOL, 0, 1 },
+        { "cl_healthblink", "enable/disable health blinking when under 15 health points", (void *)&gHealthBlink, CVAR_BOOL, 0, 1 },
         { "cl_killmsg", "enable/disable kill messages", (void *)&gKillMsg, CVAR_BOOL, 0, 1 },
         { "cl_killobituaries", "enable/disable random obituary kill messages", (void *)&gKillObituary, CVAR_BOOL, 0, 1 },
         { "cl_multikill", "enable/disable multi kill messages (0: disable, 1: enable, 2: enable + audio alert)", (void *)&gMultiKill, CVAR_INT, 0, 2 },
@@ -1072,6 +1074,7 @@ int32_t registerosdcommands(void)
         { "hud_statsautomaponly", "enable/disable showing level statistics display only on map view", (void *)&gLevelStatsOnlyOnMap, CVAR_BOOL, 0, 1 },
         { "hud_ratio", "set aspect ratio screen position for hud (0: native, 1: 4:3, 2: 16:10, 3: 16:9, 3: 21:9)", (void*)&gHudRatio, CVAR_INT, 0, 4 },
         { "hud_powerupduration", "enable/disable displaying the remaining time for power-ups (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])", (void *)&gPowerupDuration, CVAR_INT, 0, 5 },
+        { "hud_powerupdurationstyle", "set the display style for the remaining time for power-ups (0: nblood, 1: notblood)", (void *)&gPowerupStyle, CVAR_BOOL, 0, 1 },
         { "hud_powerupdurationticks", "set the tickrate divide value used for displaying the remaining time for power-ups (default: 100, realtime seconds: 120)", (void *)&gPowerupTicks, CVAR_INT, 20, 240 },
         { "hud_showendtime", "enable/disable displaying the level completion time on end screen", (void*)&gShowCompleteTime, CVAR_BOOL, 0, 1 },
         { "hud_showmaptitle", "enable/disable displaying the map title at the beginning of the maps", (void*)& gShowMapTitle, CVAR_BOOL, 0, 1 },
@@ -1116,6 +1119,7 @@ int32_t registerosdcommands(void)
         { "mus_volume", "controls music volume", (void *)&MusicVolume, CVAR_INT, 0, 255 },
         { "mus_device", "music device", (void *)&MusicDevice, CVAR_INT, 0, ASS_NumSoundCards },
         { "mus_redbook", "enables/disables redbook audio", (void *)&CDAudioToggle, CVAR_BOOL, 0, 1 },
+        { "mus_redbookfallback", "enables/disables redbook audio if midi song is not specified for level (mus_redbook must already be enabled)", (void *)&CDAudioFallback, CVAR_BOOL, 0, 1 },
         { "net_address","sets network address used for multiplayer", (void *)zNetAddressBuffer, CVAR_STRING|CVAR_FUNCPTR, 0, 16 },
         { "net_port","sets network port used for multiplayer", (void *)zNetPortBuffer, CVAR_STRING|CVAR_FUNCPTR, 0, 6 },
 //

@@ -699,13 +699,6 @@ static FORCE_INLINE int32_t Blrintf(const float x)
 # define Bsqrtf sqrtf
 #endif
 
-// redefined for apple/ppc, which chokes on stderr when linking...
-#if defined EDUKE32_OSX && defined __BIG_ENDIAN__
-# define ERRprintf(fmt, ...) printf(fmt, ## __VA_ARGS__)
-#else
-# define ERRprintf(fmt, ...) fprintf(stderr, fmt, ## __VA_ARGS__)
-#endif
-
 #ifdef __ANDROID__
 void eduke32_exit_return(int) ATTRIBUTE((noreturn));
 # define exit(x) eduke32_exit_return(x)
@@ -1505,7 +1498,12 @@ static inline void maybe_grow_buffer(char ** const buffer, int32_t * const buffe
 #include "clockticks.hpp"
 #endif
 
-#include "debugbreak.h"
+#ifdef NDEBUG
+# define debug_break() ((void)0)
+#else
+# include "debugbreak.h"
+#endif
+
 #include "rdtsc.h"
 
 /* End dependence on compat.o object. */

@@ -99,7 +99,7 @@ enum rendmode_t {
 #define MAXPLAYERS 16
 // Maximum number of component tiles in a multi-psky:
 #define MAXPSKYTILES 16
-#define MAXSPRITESONSCREEN (MAXSPRITES >> 2)
+#define MAXSPRITESONSCREEN 4096
 #define MAXUNIQHUDID 256 //Extra slots so HUD models can store animation state without messing game sprites
 
 #define TSPR_TEMP 99
@@ -251,9 +251,12 @@ enum {
     ROTATESPRITE_FULL16 = 2048,
     RS_LERP = 4096,
     RS_FORCELERP = 8192,
+    RS_NOPOSLERP = 16384,
+    RS_NOZOOMLERP = 32768,
+    RS_NOANGLERP = 65536,
 
     // ROTATESPRITE_MAX-1 is the mask of all externally available orientation bits
-    ROTATESPRITE_MAX = 16384,
+    ROTATESPRITE_MAX = 131072,
 
     RS_CENTERORIGIN = (1<<30),
 };
@@ -323,15 +326,6 @@ static FORCE_INLINE void sprite_tracker_hook__(intptr_t address);
 //  Win64: http://msdn.microsoft.com/en-us/library/9dbwhz68.aspx
 //
 //  x86: http://en.wikipedia.org/wiki/Data_structure_alignment#Typical_alignment_of_C_structs_on_x86
-
-enum {
-    SPR_XFLIP = 4,
-    SPR_YFLIP = 8,
-
-    SPR_WALL = 16,
-    SPR_FLOOR = 32,
-    SPR_ALIGN_MASK = 32+16,
-};
 
 #define UNTRACKED_STRUCTS__
 #include "buildtypes.h"
@@ -594,7 +588,8 @@ enum
     TSPR_FLAGS_DRAW_LAST = 1u<<1u,
     TSPR_FLAGS_NO_SHADOW = 1u<<2u,
     TSPR_FLAGS_INVISIBLE_WITH_SHADOW = 1u<<3u,
-    TSPR_FLAGS_SLOPE_SPRITE = 1u<<4u,
+    TSPR_FLAGS_SLAB = 1u<<4u,
+    TSPR_FLAGS_NO_GLOW = 1u<<5u,
 };
 
 EXTERN int32_t guniqhudid;
@@ -727,13 +722,6 @@ static inline tspriteptr_t renderMakeTSpriteFromSprite(tspriteptr_t const tspr, 
     tspr->clipdist = 0;
     tspr->owner = spritenum;
 
-    if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_SLOPE)
-    {
-        tspr->cstat &= ~CSTAT_SPRITE_ALIGNMENT_MASK;
-        tspr->cstat |= CSTAT_SPRITE_ALIGNMENT_FLOOR;
-        tspr->clipdist |= TSPR_FLAGS_SLOPE_SPRITE;
-    }
-
     return tspr;
 }
 
@@ -745,8 +733,8 @@ static inline tspriteptr_t renderAddTSpriteFromSprite(uint16_t const spritenum)
 static inline void spriteSetSlope(uint16_t const spritenum, int16_t const heinum)
 {
     auto const spr = &sprite[spritenum];
-    uint16_t const cstat = spr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK;
-    if (cstat != CSTAT_SPRITE_ALIGNMENT_FLOOR && cstat != CSTAT_SPRITE_ALIGNMENT_SLOPE)
+    uint16_t const cstat = spr->cstat;
+    if (!(cstat & CSTAT_SPRITE_ALIGNMENT_FLOOR))
         return;
 
     spr->xoffset = heinum & 255;
@@ -1032,6 +1020,8 @@ EXTERN char faketile[bitmap_size(MAXTILES)];
 EXTERN char *faketiledata[MAXTILES];
 EXTERN int faketilesize[MAXTILES];
 
+EXTERN uint8_t tilefilenum[MAXTILES];
+
 EXTERN char spritecol2d[MAXTILES][2];
 EXTERN uint8_t tilecols[MAXTILES];
 
@@ -1061,7 +1051,11 @@ extern char g_haveVoxels;
 
 enum
 {
-    VF_NOTRANS = 1,
+    VF_NOTRANS = 1<<0,
+    // begin downstream
+    VF_ROTATE  = 1<<6,
+    VF_RESERVE = 1<<7,
+    // end downstream
 };
 
 extern int32_t usehightile;
@@ -1627,8 +1621,6 @@ extern GrowArray<char *> g_clipMapFiles;
 
 EXTERN int32_t nextvoxid;
 EXTERN intptr_t voxoff[MAXVOXELS][MAXVOXMIPS]; // used in KenBuild
-EXTERN int8_t voxreserve[(MAXVOXELS+7)>>3];
-EXTERN int8_t voxrotate[(MAXVOXELS+7)>>3];
 
 #ifdef USE_OPENGL
 // TODO: dynamically allocate this
@@ -1833,7 +1825,7 @@ extern void(*PolymostProcessVoxels_Callback)(void);
 
 static inline int16_t tspriteGetSlope(tspriteptr_t const tspr)
 {
-    if (!(tspr->clipdist & TSPR_FLAGS_SLOPE_SPRITE))
+    if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT) != CSTAT_SPRITE_ALIGNMENT_SLOPE)
         return 0;
     return uint8_t(tspr->xoffset) + (uint8_t(tspr->yoffset) << 8);
 }

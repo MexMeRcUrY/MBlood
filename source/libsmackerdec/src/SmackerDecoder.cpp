@@ -50,7 +50,7 @@
 #include "compat.h"
 #include "baselayer.h"
 
-std::vector<class SmackerDecoder*> classInstances;
+GrowArray<class SmackerDecoder*> classInstances;
 
 SmackerHandle Smacker_Open(const char* fileName)
 {
@@ -248,9 +248,9 @@ typedef struct HuffContext {
     int maxlength;
     int current;
 
-	std::vector<uint32_t> bits;
-	std::vector<int> lengths;
-	std::vector<int> values;
+	GrowArray<uint32_t> bits;
+	GrowArray<int> lengths;
+	GrowArray<int> values;
 
 } HuffContext;
 
@@ -258,19 +258,19 @@ typedef struct HuffContext {
 typedef struct DBCtx {
 	SmackerCommon::VLCtable v1;
 	SmackerCommon::VLCtable v2;
-	std::vector<int> recode1, recode2;
+	GrowArray<int> recode1, recode2;
     int escapes[3];
     int *last;
     int lcur;
 } DBCtx;
 
 
-static void last_reset(std::vector<int> &recode, int *last) {
+static void last_reset(GrowArray<int> &recode, int *last) {
     recode[last[0]] = recode[last[1]] = recode[last[2]] = 0;
 }
 
 /* get code and update history */
-int SmackerDecoder::GetCode(SmackerCommon::BitReader &bits, std::vector<int> &recode, int *last)
+int SmackerDecoder::GetCode(SmackerCommon::BitReader &bits, GrowArray<int> &recode, int *last)
 {
 	int *table = &recode[0];
 
@@ -301,7 +301,7 @@ bool SmackerDecoder::Open(const char *fileName)
 	file.Open(fileName);
 	if (!file.Is_Open())
 	{
-        buildprintf("SmackerDecoder::Open() - Can't open file %s\n", fileName);
+        LOG_F(ERROR, "SmackerDecoder::Open() - Can't open file %s", fileName);
 		return false;
 	}
 
@@ -310,7 +310,7 @@ bool SmackerDecoder::Open(const char *fileName)
 	if (memcmp(signature, kSMK2iD, 4) != 0
 		&& memcmp(signature, kSMK4iD, 4) != 0)
 	{
-        buildprintf("SmackerDecoder::Open() - Unknown Smacker signature\n");
+        LOG_F(ERROR, "SmackerDecoder::Open() - Unknown Smacker signature");
 		return false;
 	}
 
@@ -358,7 +358,7 @@ bool SmackerDecoder::Open(const char *fileName)
 
 	if (nFrames > 0xFFFFFF)
 	{
-        buildprintf("SmackerDecoder::Open() - Too many frames\n");
+        LOG_F(ERROR, "SmackerDecoder::Open() - Too many frames");
 		return false;
 	}
 
@@ -448,7 +448,7 @@ int SmackerDecoder::DecodeTree(SmackerCommon::BitReader &bits, HuffContext *hc, 
     if (!bits.GetBit()) // Leaf
 	{
         if (hc->current >= 256){
-            buildprintf("SmackerDecoder::DecodeTree() - Tree size exceeded\n");
+            LOG_F(ERROR, "SmackerDecoder::DecodeTree() - Tree size exceeded");
             return -1;
         }
         if (length){
@@ -487,7 +487,7 @@ int SmackerDecoder::DecodeBigTree(SmackerCommon::BitReader &bits, HuffContext *h
 		i2 = 0;
 
 		if (hc->current >= hc->length){
-            buildprintf("SmackerDecoder::DecodeBigTree() - Tree size exceeded");
+            LOG_F(ERROR, "SmackerDecoder::DecodeBigTree() - Tree size exceeded");
             return -1;
         }
 
@@ -540,7 +540,7 @@ int SmackerDecoder::DecodeBigTree(SmackerCommon::BitReader &bits, HuffContext *h
 /**
  * Store large tree as Libav's vlc codes
  */
-int SmackerDecoder::DecodeHeaderTree(SmackerCommon::BitReader &bits, std::vector<int> &recodes, int *last, int size)
+int SmackerDecoder::DecodeHeaderTree(SmackerCommon::BitReader &bits, GrowArray<int> &recodes, int *last, int size)
 {
 	HuffContext huff;
 	HuffContext tmp1, tmp2;
@@ -549,7 +549,7 @@ int SmackerDecoder::DecodeHeaderTree(SmackerCommon::BitReader &bits, std::vector
 
 	if ((uint32_t)size >= UINT_MAX>>4)
 	{
-        buildprintf("SmackerDecoder::DecodeHeaderTree() - Size too large\n");
+        LOG_F(ERROR, "SmackerDecoder::DecodeHeaderTree() - Size too large");
 		return -1;
 	}
 
@@ -958,7 +958,7 @@ int SmackerDecoder::DecodeFrame(uint32_t frameSize)
  */
 int SmackerDecoder::DecodeAudio(uint32_t size, SmackerAudioTrack &track)
 {
-    HuffContext h[4];
+    HuffContext h[4]{};
 	SmackerCommon::VLCtable vlc[4];
     int val;
     int i, res;
@@ -972,7 +972,7 @@ int SmackerDecoder::DecodeAudio(uint32_t size, SmackerAudioTrack &track)
 	int buf_size = track.bufferSize;
 
     if (buf_size <= 4) {
-        buildprintf("SmackerDecoder::DecodeAudio() - Packet is too small\n");
+        LOG_F(ERROR, "SmackerDecoder::DecodeAudio() - Packet is too small");
 		return -1;
     }
 
@@ -989,11 +989,9 @@ int SmackerDecoder::DecodeAudio(uint32_t size, SmackerAudioTrack &track)
     sampleBits = bits.GetBit();
 
     if (stereo ^ (track.nChannels != 1)) {
-        buildprintf("SmackerDecoder::DecodeAudio() - Channels mismatch\n");
+        LOG_F(ERROR, "SmackerDecoder::DecodeAudio() - Channels mismatch");
 		return -1;
     }
-
-    memset(h, 0, sizeof(HuffContext) * 4);
 
     // Initialize
     for (i = 0; i < (1 << (sampleBits + stereo)); i++) {
@@ -1113,7 +1111,7 @@ float SmackerDecoder::GetFrameRate()
 void SmackerDecoder::GotoFrame(uint32_t frameNum)
 {
 	if (frameNum > nFrames) {
-        buildprintf("SmackerDecoder::GotoFrame() - Invalid frame number\n");
+        LOG_F(ERROR, "SmackerDecoder::GotoFrame() - Invalid frame number");
 		return;
 	}
 
@@ -1122,7 +1120,7 @@ void SmackerDecoder::GotoFrame(uint32_t frameNum)
     currentFrame = 0;
     nextPos = firstFrameFilePos;
 
-    for (int i = 0; i < frameNum + 1; i++)
+    for (uint32_t i = 0; i < frameNum + 1; i++)
         GetNextFrame();
 }
 

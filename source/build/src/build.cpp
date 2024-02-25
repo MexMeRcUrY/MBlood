@@ -558,8 +558,8 @@ static void M32_FatalEngineError(void)
 #ifdef DEBUGGINGAIDS
     debug_break();
 #endif
-    Bsprintf(tempbuf, "There was a problem initializing the engine: %s\n", engineerrstr);
-    ERRprintf("%s", tempbuf);
+    Bsprintf(tempbuf, "There was a problem initializing the engine: %s", engineerrstr);
+    LOG_F(ERROR, "%s", tempbuf);
     fatal_exit(tempbuf);
 }
 
@@ -648,11 +648,11 @@ int app_main(int argc, char const* const* argv)
     pathsearchmode = 1;		// unrestrict findfrompath so that full access to the filesystem can be had
 
 #ifdef USE_OPENGL
-    OSD_RegisterFunction("restartvid","restartvid: reinitialize the video mode",osdcmd_restartvid);
-    OSD_RegisterFunction("vidmode","vidmode <xdim> <ydim> <bpp> <fullscreen>: immediately change the video mode",osdcmd_vidmode);
+    OSD_RegisterFunction("restartvid","restartvid: reinitializes the video mode",osdcmd_restartvid);
+    OSD_RegisterFunction("vidmode","vidmode <xdim> <ydim> <bpp> <fullscreen>: changes the video mode",osdcmd_vidmode);
     baselayer_osdcmd_vidmode_func = osdcmd_vidmode;
 #else
-    OSD_RegisterFunction("vidmode","vidmode <xdim> <ydim>: immediately change the video mode",osdcmd_vidmode);
+    OSD_RegisterFunction("vidmode","vidmode <xdim> <ydim>: changes the video mode",osdcmd_vidmode);
 #endif
 
     wm_setapptitle(AppProperName);
@@ -1006,9 +1006,9 @@ void spriteoncfz(int32_t i, int32_t *czptr, int32_t *fzptr)
     int32_t height, zofs;
 
     getzsofslope(sprite[i].sectnum, sprite[i].x,sprite[i].y, czptr, fzptr);
-    if ((sprite[i].cstat&48)==32)
+    if ((sprite[i].cstat & CSTAT_SPRITE_ALIGNMENT) == CSTAT_SPRITE_ALIGNMENT_FLOOR)
         return;
-    if ((sprite[i].cstat&48)==48)
+    if ((sprite[i].cstat & CSTAT_SPRITE_ALIGNMENT) == CSTAT_SPRITE_ALIGNMENT_SLOPE)
     {
         int32_t const heinum = spriteGetSlope(i);
         int32_t const ratio = divscale12(heinum, ksqrt(heinum*heinum+16777216));
@@ -1550,10 +1550,10 @@ void editinput(void)
                     spriteoncfz(i, &cz, &fz);
                     sprite[i].z = clamp2(hit.z, cz, fz);
 
-                    if (AIMING_AT_WALL || AIMING_AT_MASKWALL || (AIMING_AT_SPRITE && (sprite[searchwall].cstat & CSTAT_SPRITE_ALIGNMENT_SLAB) == CSTAT_SPRITE_ALIGNMENT_WALL))
+                    if (AIMING_AT_WALL || AIMING_AT_MASKWALL || (AIMING_AT_SPRITE && (sprite[searchwall].cstat & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_WALL))
                     {
-                        sprite[i].cstat &= ~48;
-                        sprite[i].cstat |= (16+64);
+                        sprite[i].cstat &= ~CSTAT_SPRITE_ALIGNMENT;
+                        sprite[i].cstat |= CSTAT_SPRITE_ONE_SIDED|CSTAT_SPRITE_ALIGNMENT_WALL;
 
                         correct_ornamented_sprite(i, hit);
                     }
@@ -2440,7 +2440,7 @@ static int32_t insert_sprite_common(int32_t sectnum, int32_t dax, int32_t day)
 
 void correct_sprite_yoffset(int32_t i)
 {
-    if ((sprite[i].cstat&48) >= 32)
+    if (sprite[i].cstat & CSTAT_SPRITE_ALIGNMENT_FLOOR)
         return;
     int32_t tileyofs = picanm[sprite[i].picnum].yofs;
     int32_t tileysiz = tilesiz[sprite[i].picnum].y;
@@ -2899,6 +2899,8 @@ void SetFirstWall(int32_t sectnum, int32_t wallnum, int32_t alsoynw)
 {
 #ifdef YAX_ENABLE
     int32_t i, j, k=0;
+#else
+    UNREFERENCED_PARAMETER(alsoynw);
 #endif
     const sectortype *sec = &sector[sectnum];
 
@@ -3153,6 +3155,8 @@ static int32_t M32_InsertPoint(int32_t thewall, int32_t dax, int32_t day, int16_
             return m|(j<<16);
     }
     else
+#else
+    UNREFERENCED_PARAMETER(onewnumwalls);
 #endif
     {
         insertpoint(thewall, dax,day, mapwallnum);
@@ -3741,7 +3745,7 @@ extern void editorFlipHighlightedSectors(int about_x, int doMirror)
                         sprite[j].ang = (2048-sprite[j].ang)&2047; //flip ang about 512
                     }
 
-                    if (doMirror && (sprite[j].cstat & 0x30))
+                    if (doMirror && (sprite[j].cstat & CSTAT_SPRITE_ALIGNMENT))
                         sprite[j].cstat ^= 4;  // mirror sprites about dax/day (don't mirror monsters)
 
                     j = nextspritesect[j];
@@ -6704,8 +6708,8 @@ end_point_dragging:
                         joinsector[1] = i;
 
                         const int s1to0wall = find_nextwall(i, joinsector[0]);
-                        const int s0to1wall = s1to0wall == -1 ? -1 : wall[s1to0wall].nextwall;
 #ifdef YAX_ENABLE
+                        const int s0to1wall = s1to0wall == -1 ? -1 : wall[s1to0wall].nextwall;
                         int16_t jbn[2][2];  // [join index][c/f]
 
                         for (k=0; k<2; k++)
@@ -7770,7 +7774,11 @@ check_next_sector: ;
 
                     if (numwalls==expectedNumwalls)
                     {
+#ifdef YAX_ENABLE
                         if (doSectorSplit && cb<0 && fb<0)
+#else
+                        if (doSectorSplit)
+#endif
                         {
                             if (firstwallflag)
                             {
@@ -11287,7 +11295,7 @@ void test_map(int32_t mode)
         // and a possible extra space not in testplay_addparam,
         // the length should be Bstrlen(game_executable)+Bstrlen(param)+(slen+1)+2+1.
 
-        char *fullparam = (char *)Xmalloc(Bstrlen(game_executable)+Bstrlen(param)+slen+4);
+        char *fullparam = (char *)Xmalloc(Bstrlen(game_executable)+Bstrlen(param)+slen+8);
         Bsprintf(fullparam,"\"%s\"",game_executable);
 
         if (testplay_addparam)
@@ -11319,9 +11327,9 @@ void test_map(int32_t mode)
 
             if (!CreateProcess(NULL,fullparam,NULL,NULL,0,0,NULL,NULL,&si,&pi))
                 message("Error launching the game!");
-            else WaitForSingleObject(pi.hProcess,INFINITE);
         }
 #else
+        Bstrcat(fullparam, " &");
         if (current_cwd[0] != '\0')
         {
             buildvfs_chdir(program_origcwd);
@@ -11329,9 +11337,9 @@ void test_map(int32_t mode)
                 message("Error launching the game!");
             buildvfs_chdir(current_cwd);
         }
-        else system(fullparam);
+        else if (system(fullparam))
+            message("Error launching the game!");
 #endif
-        printmessage16("Game process exited");
 //        mouseInit();
         clearkeys();
 

@@ -12,13 +12,11 @@
 
 ### Downloads
 Download for Windows/Linux/MacOS can be found on [https://github.com/clipmove/NotBlood/releases](https://github.com/clipmove/NotBlood/releases)
-<details><summary><h3 dir="auto">New Features For NotBlood</h3></summary>
 
 ### Features
 * Switch to last active weapon if TNT/spray can is active when entering water
 * Basic room over room support for positional audio ([before](https://web.archive.org/web/20220319193715if_/https://files.catbox.moe/qca0k4.mp4)/[after](https://web.archive.org/web/20220514202908if_/https://files.catbox.moe/wq1so4.mp4))
 * Autosaving support for collecting keys and start of level
-* Increase drawn sprites on screen limit from 2560 to 4096
 * New last weapon key binding (default Q) ([demo](https://web.archive.org/web/20220319193716if_/https://files.catbox.moe/28cirg.mp4))
 * Vanilla mode (v1.21) with optional DOS mouse handling
 * BloodGDX style difficulty options for singleplayer
@@ -60,29 +58,25 @@ Download for Windows/Linux/MacOS can be found on [https://github.com/clipmove/No
 * Make blood splatter/flare gun glow effect slope on sloped surfaces
 </details>
 
-<details><summary><h3 dir="auto">Installing</h3></summary>
-
+### Installing
 1. Extract NotBlood to a new directory
 2. Copy the following files from Blood 1.21 to NotBlood folder:
-
-   ```
-   BLOOD.INI
-   BLOOD.RFF
-   BLOOD000.DEM, ..., BLOOD003.DEM (optional)
-   CP01.MAP, ..., CP09.MAP (optional, Cryptic Passage)
-   CPART07.AR_ (optional, Cryptic Passage)
-   CPART15.AR_ (optional, Cryptic Passage)
-   CPBB01.MAP, ..., CPBB04.MAP (optional, Cryptic Passage)
-   CPSL.MAP (optional, Cryptic Passage)
-   CRYPTIC.INI (optional, Cryptic Passage)
-   CRYPTIC.SMK (optional, Cryptic Passage)
-   CRYPTIC.WAV (optional, Cryptic Passage)
-   GUI.RFF
-   SOUNDS.RFF
-   SURFACE.DAT
-   TILES000.ART, ..., TILES017.ART
-   VOXEL.DAT
-   ```
+   * BLOOD.INI
+   * BLOOD.RFF
+   * BLOOD000.DEM, ..., BLOOD003.DEM (optional)
+   * CP01.MAP, ..., CP09.MAP (optional, Cryptic Passage)
+   * CPART07.AR_ (optional, Cryptic Passage)
+   * CPART15.AR_ (optional, Cryptic Passage)
+   * CPBB01.MAP, ..., CPBB04.MAP (optional, Cryptic Passage)
+   * CPSL.MAP (optional, Cryptic Passage)
+   * CRYPTIC.INI (optional, Cryptic Passage)
+   * CRYPTIC.SMK (optional, Cryptic Passage)
+   * CRYPTIC.WAV (optional, Cryptic Passage)
+   * GUI.RFF
+   * SOUNDS.RFF
+   * SURFACE.DAT
+   * TILES000.ART, ..., TILES017.ART
+   * VOXEL.DAT
 
 3. Optionally, if you want to use CD audio tracks instead of MIDI, provide FLAC/OGG recordings in following format: bloodXX.flac/ogg, where XX is track number. Make sure to enable Redbook audio option in sound menu.
 4. Optionally, if you want cutscenes and you have the original CD, copy the `movie` folder into NotBlood's folder (the folder itself too).

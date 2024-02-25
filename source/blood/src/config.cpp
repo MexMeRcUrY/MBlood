@@ -92,10 +92,12 @@ int32_t gAutoRun;
 int32_t gCalebTalk;
 int32_t gChatSnd;
 int32_t gColorMsg;
+int32_t gHealthBlink;
 int32_t gKillObituary;
 int32_t gKillMsg;
 int32_t gMultiKill;
 int32_t gStompSound;
+int32_t gViewDim;
 int32_t gViewInterpolate;
 int32_t gPanningInterpolate;
 int32_t gWeaponInterpolate;
@@ -138,6 +140,7 @@ int32_t gHudBgNewBorder;
 int32_t gHudBgScale;
 int32_t gHudBgVanilla;
 int32_t gPowerupDuration;
+int32_t gPowerupStyle;
 int32_t gPowerupTicks;
 int32_t gShowCompleteTime;
 int32_t gShowMapTitle;
@@ -278,7 +281,7 @@ void CONFIG_SetDefaultKeys(const char (*keyptr)[MAXGAMEFUNCLEN], bool lazy/*=fal
         {
 #if 0 // defined(DEBUGGINGAIDS)
             if (key[0] != 0xff)
-                initprintf("Skipping %s bound to %s\n", keyptr[i<<1], CONTROL_KeyBinds[default0].cmdstr);
+                LOG_F(INFO, "Skipping %s bound to %s", keyptr[i<<1], CONTROL_KeyBinds[default0].cmdstr);
 #endif
             continue;
         }
@@ -408,6 +411,7 @@ void CONFIG_SetDefaults(void)
     //ud.config.ShowWeapons     = 0;
     SoundToggle     = 1;
     CDAudioToggle = 0;
+    CDAudioFallback = 0;
     DopplerToggle = 1;
     MusicDevice = ASS_SF2;
     Bstrcpy(SF2_BankFile, "notblood.sf2");
@@ -432,6 +436,7 @@ void CONFIG_SetDefaults(void)
     gHudBgScale = 1;
     gHudBgVanilla = 0;
     gPowerupDuration = 4;
+    gPowerupStyle = 1;
     gPowerupTicks = 100;
     gShowCompleteTime = 1;
     gShowMapTitle = 1;
@@ -480,7 +485,7 @@ void CONFIG_SetDefaults(void)
     //ud.weaponswitch           = 3;  // new+empty
     gFov = 90;
     gRollAngle = 0;
-    gCenterHoriz = 1;
+    gCenterHoriz = 0;
     gDeliriumBlur = 1;
     gViewSize = 3;
     gTurnSpeed = 92;
@@ -493,10 +498,12 @@ void CONFIG_SetDefaults(void)
     gCalebTalk = 0;
     gChatSnd = 1;
     gColorMsg = 1;
+    gHealthBlink = 1;
     gKillObituary = 1;
     gKillMsg = 1;
     gMultiKill = 2;
     gStompSound = 0;
+    gViewDim = 1;
     gViewInterpolate = 1;
     gPanningInterpolate = 1;
     gWeaponInterpolate = 1;
@@ -922,7 +929,7 @@ int CONFIG_ReadSetup(void)
         {
             if ((st.st_mode & S_IFDIR) != S_IFDIR)
             {
-                initprintf("Invalid mod dir in cfg!\n");
+                LOG_F(ERROR, "Invalid mod dir in cfg!");
                 Bsprintf(g_modDir,"/");
             }
         }

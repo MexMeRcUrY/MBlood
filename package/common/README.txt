@@ -5,7 +5,6 @@ A gameplay modification of Blood, based upon the EDuke32 driven Blood reverse-en
 * Switch to last active weapon if TNT/spray can is active when entering water
 * Basic room over room support for positional audio
 * Autosaving support for collecting keys and start of level
-* Increase drawn sprites on screen limit from 2560 to 4096
 * New last weapon key binding (default Q)
 * Vanilla mode (v1.21) with optional DOS mouse handling
 * BloodGDX style difficulty options for singleplayer
@@ -112,6 +111,9 @@ It should be noted that vanilla mode does not work with modern maps
    - Improved beast stomp attack sector scanning
    - Fix bloated butchers cleavers hitting prone players
    - Turn enemy around if stuck running into a corner for a few seconds
+   - Limit impulse damage when shooting enemies downward at point-blank
+   - Cheogh blasting/attacking can now hit prone players (only for well done and above difficulties)
+   - Fix Beast state when leaving water sector
 * Random cultist TNT
    - This will make cultists use a variety of random thrown sprites such as:
    - Napalm balls, proxy bundles, armed spray cans or pod projectiles
@@ -146,7 +148,7 @@ It should be noted that vanilla mode does not work with modern maps
    - Use Raze phase calculation for smoother elevator rides
 * Hitscan projectiles
    - Makes enemies that use hitscan bullets spawn physical sprite based bullets with travel time
-   - Projectile speed is adjusted depending on difficulty and if bullet is underwater
+   - Projectile speed is adjusted if bullet is underwater (25% speed penalty)
    - This mutator does not support custom modern map enemies
 * Randomizer mode
    - Set the enemy/pickups randomizer mode
@@ -187,12 +189,16 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable Caleb's dialog lines (0: on, 1: no idle, 2: no explosion/gib, 3: off)
 * cl_chatsnd
    - Enable/disable multiplayer chat message beep
+* cl_dim
+   - Enable/disable dimming background when menu is active
 * cl_interpolatepanning
    - Enable/disable sector texture panning interpolation (cl_interpolate must be set on)
 * cl_interpolateweapon
    - Enable/disable view interpolation for drawn weapon (0: disable, 1: position, 2: position/qav animation)
 * cl_colormsg
    - Enable/disable colored player names in messages
+* cl_healthblink
+   - Enable/disable health blinking when under 15 health points
 * cl_killmsg
    - Enable/disable kill messages
 * cl_killobituaries
@@ -239,6 +245,10 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable showing level statistics display only on map view
 * hud_ratio
    - Enable/disable level statistics display (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])
+* hud_powerupduration
+   - Enable/disable displaying the remaining time for power-ups (0: off, 1: on [default], 2: on [4:3], 3: on [16:10], 4: on [16:9], 5: on [21:9])
+* hud_powerupdurationstyle
+   - Set the display style for the remaining time for power-ups (0: nblood, 1: notblood)
 * hud_powerupdurationticks
    - Set the tickrate divide value used for displaying the remaining time for power-ups (default: 100, realtime seconds: 120)
 * hud_showendtime
@@ -255,6 +265,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Position offset for selected weapon weapon bar
 * hud_showweaponselectscale
    - Sets scale for selected weapon weapon bar (default: 10, range: 5-20)
+* mus_redbookfallback
+   - Enables/disables redbook audio if midi song is not specified for level (mus_redbook must already be enabled)
 * in_centerviewondrop
    - Enable/disable recenter view when dropping down onto ground
 * in_crouchmode

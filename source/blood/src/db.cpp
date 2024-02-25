@@ -963,7 +963,7 @@ void dbRandomizerMode(spritetype *pSprite)
             {
                 static char bShownError = 0;
                 if (!bShownError) // only show once per session
-                    initprintf("Error invalid cheat seed %s (%d)\nAdd seed cheat effect to func dbRandomizerMode()\n\n", gGameOptions.szRandomizerSeed, gGameOptions.nRandomizerCheat);
+                    LOG_F(WARNING, "Error invalid cheat seed %s (%d)\nAdd seed cheat effect to func dbRandomizerMode()", gGameOptions.szRandomizerSeed, gGameOptions.nRandomizerCheat);
                 bShownError = 1;
                 break;
             }
@@ -972,18 +972,7 @@ void dbRandomizerMode(spritetype *pSprite)
         }
     }
 
-    if (gGameOptions.nEnemyQuantity <= 2) // don't always replace enemies/pickups
-    {
-        if (!dbRandomizerRNG(2)) return;
-    }
-    else if (gGameOptions.nEnemyQuantity == 3) // well done
-    {
-        if (!dbRandomizerRNG(4)) return;
-    }
-    else // extra crispy
-    {
-        if (!dbRandomizerRNG(5)) return;
-    }
+    if (!dbRandomizerRNG(5)) return;
 
     if (gGameOptions.nRandomizerMode & 1) // if enemies or enemies+weapons mode, randomize enemy
     {
@@ -1414,30 +1403,46 @@ void dbRandomizerModeScale(spritetype *pSprite, XSPRITE* pXSprite)
     }
 }
 
-void dbShuffleEnemy(void)
+inline int dbShuffleEnemyList(spritetype **pSpriteList = NULL)
 {
     int nSprites = 0;
-    spritetype *pSprite[kMaxSprites];
-
-    for (int i = headspritestat[kStatDude]; i >= 0; i = nextspritestat[i]) // build table of sprites for shuffling logic
+    for (int i = headspritestat[kStatDude]; i >= 0; i = nextspritestat[i])
     {
-        if (&sprite[i] == NULL)
-            continue;
         if (!IsDudeSprite(&sprite[i]) || IsPlayerSprite(&sprite[i])) // not an enemy sprite, skip
             continue;
         const int type = sprite[i].type;
         if ((type >= kDudeCultistTommy) && (type <= kDudeBurningBeast) && !(type >= kDudePlayer1 && type <= kDudePlayer8) && (type != kDudeCultistReserved) && (type != kDudeBeast) && (type != kDudeCultistBeast) && (type != kDudeGargoyleStone) && (type != kDudeTchernobog) && (type != kDudeCerberusTwoHead) && (type != kDudeCerberusOneHead) && (type != kDudeSpiderMother) && (type != kDudeBoneEel)) // filter problematic enemy types
         {
-            pSprite[nSprites] = &sprite[i];
+            if (pSpriteList)
+                pSpriteList[nSprites] = &sprite[i];
             nSprites++;
         }
     }
-    if (nSprites < 2) // only a single enemy in the level, abort
+
+    return nSprites;
+}
+
+void dbShuffleEnemy(void)
+{
+    int nSprites = dbShuffleEnemyList(); // get total enemies to shuffle
+    if (nSprites < 2) // only two enemies in the level, abort
         return;
 
-    for (int i = 0; i < nSprites - 1; i++) // shuffle enemies
+    nSprites = ClipRange(nSprites, 0, kMaxSprites-1);
+    spritetype **pSprite = (spritetype **)Bmalloc((nSprites+1) * sizeof(spritetype));
+    if (!pSprite)
+        return;
+    dbShuffleEnemyList(pSprite); // assign sprites to pointer array
+
+    for (int i = 0; i < nSprites; i++) // shuffle enemies
     {
-        const int j = qrand() % nSprites;
+        int j = qrand() % nSprites;
+        if (i == j)
+        {
+            j = qrand() % nSprites; // re-roll
+            if (i == j) // bah! just our luck...
+                continue;
+        }
 
         const int16_t tempType = pSprite[j]->type;
         pSprite[j]->type = pSprite[i]->type;
@@ -1467,6 +1472,7 @@ void dbShuffleEnemy(void)
         pSprite[j]->inittype = pSprite[i]->inittype;
         pSprite[i]->inittype = tempInittype;
     }
+    Bfree(pSprite);
 }
 
 bool byte_1A76C6, byte_1A76C7, byte_1A76C8;
@@ -1500,7 +1506,7 @@ unsigned int dbReadMapCRC(const char *pPath)
 
     if (!pNode)
     {
-        initprintf("Error opening map file %s", pPath);
+        LOG_F(ERROR, "Error opening map file %s", pPath);
         pathsearchmode = bakpathsearchmode;
         return -1;
     }
@@ -1586,7 +1592,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
 
     if (!pNode)
     {
-        initprintf("Error opening map file %s", pPath);
+        LOG_F(ERROR, "Error opening map file %s", pPath);
         pathsearchmode = bakpathsearchmode;
         return -1;
     }
@@ -1601,7 +1607,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
 #endif
     if (memcmp(header.signature, "BLM\x1a", 4))
     {
-        initprintf("Map file corrupted");
+        LOG_F(ERROR, "Map file corrupted");
         gSysRes.Unlock(pNode);
         return -1;
     }
@@ -1627,7 +1633,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
         #endif
 
     } else {
-        initprintf("Map file is wrong version");
+        LOG_F(ERROR, "Map file is wrong version");
         gSysRes.Unlock(pNode);
         return -1;
     }
@@ -1677,14 +1683,14 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
         }
         else
         {
-            initprintf("Corrupted Map file");
+            LOG_F(ERROR, "Corrupted Map file");
             gSysRes.Unlock(pNode);
             return -1;
         }
     }
     else if (mapHeader.at16)
     {
-        initprintf("Corrupted Map file");
+        LOG_F(ERROR, "Corrupted Map file");
         gSysRes.Unlock(pNode);
         return -1;
     }
@@ -2036,7 +2042,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
             xsprite[sprite[i].extra].reference = i;
             xsprite[sprite[i].extra].busy = xsprite[sprite[i].extra].state << 16;
             if (!byte_1A76C8) {
-                xsprite[sprite[i].extra].lT |= xsprite[sprite[i].extra].lB;
+                xsprite[sprite[i].extra].lT = xsprite[sprite[i].extra].lB;
             }
 
             #ifdef NOONE_EXTENSIONS
@@ -2071,7 +2077,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
     md4once((unsigned char*)pData, nSize, g_loadedMapHack.md4);
     if (Bcrc32(pData, nSize-4, 0) != nCRC)
     {
-        initprintf("Map File does not match CRC");
+        LOG_F(ERROR, "Map File does not match CRC");
         gSysRes.Unlock(pNode);
         return -1;
     }
@@ -2091,13 +2097,13 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
         }
         else
         {
-            initprintf("Corrupted Map file");
+            LOG_F(ERROR, "Corrupted Map file");
             return -1;
         }
     }
     else if (gSongId != 0)
     {
-        initprintf("Corrupted Map file");
+        LOG_F(ERROR, "Corrupted Map file");
         return -1;
     }
 
@@ -2517,13 +2523,13 @@ int dbSaveMap(const char *pPath, int nX, int nY, int nZ, short nAngle, short nSe
     int nHandle = Bopen(sMapExt, BO_BINARY|BO_TRUNC|BO_CREAT|BO_WRONLY, BS_IREAD|BS_IWRITE);
     if (nHandle == -1)
     {
-        initprintf("Couldn't open \"%s\" for writing: %s\n", sMapExt, strerror(errno));
+        LOG_F(ERROR, "Couldn't open \"%s\" for writing: %s", sMapExt, strerror(errno));
         Xfree(pData);
         return -1;
     }
     if (Bwrite(nHandle, pData, nSize) != nSize)
     {
-        initprintf("Couldn't write to \"%s\": %s\n", sMapExt, strerror(errno));
+        LOG_F(ERROR, "Couldn't write to \"%s\": %s", sMapExt, strerror(errno));
         Bclose(nHandle);
         Xfree(pData);
         return -1;

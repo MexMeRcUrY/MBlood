@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 int32_t SoundToggle;
 int32_t MusicToggle;
 int32_t CDAudioToggle;
+int32_t CDAudioFallback;
 int32_t DopplerToggle;
 int32_t FXVolume;
 int32_t MusicVolume;
@@ -461,7 +462,7 @@ void InitSoundDevice(void)
     nStatus = FX_Init(NumVoices, NumChannels, MixRate, initdata);
     if (nStatus != 0)
     {
-        initprintf("InitSoundDevice: %s\n", FX_ErrorString(nStatus));
+        LOG_F(ERROR, "InitSoundDevice: %s", FX_ErrorString(nStatus));
         return;
     }
 #ifdef ASS_REVERSESTEREO
@@ -516,7 +517,7 @@ void InitMusicDevice(void)
     }
     else if ((nStatus = MUSIC_Init(ASS_AutoDetect)) == MUSIC_Ok)
     {
-        initprintf("InitMusicDevice: %s\n", MUSIC_ErrorString(nStatus));
+        LOG_F(ERROR, "InitMusicDevice: %s", MUSIC_ErrorString(nStatus));
         return;
     }
     MUSIC_SetVolume(MusicVolume);

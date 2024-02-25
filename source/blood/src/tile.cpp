@@ -41,7 +41,7 @@ void qloadvoxel(int32_t nVoxel)
     static int nLastVoxel = 0;
     DICTNODE *hVox = gSysRes.Lookup(nVoxel, "KVX");
     if (!hVox) {
-        initprintf("Missing voxel #%d (max voxels: %d)", nVoxel, kMaxVoxels);
+        LOG_F(ERROR, "Missing voxel #%d (max voxels: %d)", nVoxel, kMaxVoxels);
         return;
     }
 
@@ -122,7 +122,7 @@ int tileInit(char a1, const char *a2)
     for (int i = 0; i < kMaxTiles; i++)
     {
         if (voxelIndex[i] >= 0 && voxelIndex[i] < kMaxVoxels)
-            SetBitString((char*)voxreserve, voxelIndex[i]);
+            voxflags[voxelIndex[i]] |= VF_RESERVE;
     }
 
     artLoaded = 1;
@@ -268,10 +268,13 @@ void tilePrecacheTile(int nTile, int nType)
     }
 }
 
-char tileGetSurfType(int hit)
+char tileGetSurfType(int hit, int nType)
 {
     int n = hit & 0x3fff;
-    switch (hit&0xc000)
+    if (nType == 0) // no type supplied, get type from hit index
+        nType = hit & 0xc000;
+
+    switch (nType)
     {
     case 0x4000:
         return surfType[sector[n].floorpicnum];

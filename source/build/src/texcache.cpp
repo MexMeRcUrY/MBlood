@@ -2,6 +2,7 @@
 
 #include "baselayer.h"
 #include "build.h"
+#include "engine_priv.h"
 #include "lz4.h"
 #include "hightile.h"
 #include "polymost.h"
@@ -106,7 +107,10 @@ static pthtyp *texcache_tryart(int32_t const dapicnum, int32_t const dapalnum, i
             if (pth->flags & PTH_INVALIDATED)
             {
                 pth->flags &= ~PTH_INVALIDATED;
-                gloadtile_art(dapicnum, searchpalnum, tintpalnum, dashade, dameth, pth, 0);
+
+                // this fixes a problem where per-map art would not be refreshed properly in Polymost between maps, where both maps used mapart
+                int32_t ismapart = (tilefilenum[dapicnum] >= MAXARTFILES_BASE) ? 1 : 0;
+                gloadtile_art(dapicnum, searchpalnum, tintpalnum, dashade, dameth, pth, ismapart);
                 pth->palnum = dapalnum;
             }
 
@@ -436,9 +440,9 @@ int texcache_loadoffsets(void)
 
     while (!scriptfile_eof(script))
     {
-        if (scriptfile_getstring(script, &fname)) break;	// hashed filename
-        if (scriptfile_getnumber(script, &foffset)) break;	// offset in cache
-        if (scriptfile_getnumber(script, &fsize)) break;	// size
+        if (scriptfile_getstring(script, &fname)) goto CLEAN_TEXCACHE;     // hashed filename
+        if (scriptfile_getnumber(script, &foffset)) goto CLEAN_TEXCACHE;   // offset in cache
+        if (scriptfile_getnumber(script, &fsize)) goto CLEAN_TEXCACHE;     // size
 
         int const i = hash_find(&texcache.hashes,fname);
 
@@ -471,6 +475,12 @@ int texcache_loadoffsets(void)
 
     scriptfile_close(script);
     return 0;
+
+CLEAN_TEXCACHE:
+    LOG_F(ERROR, "Corrupted texcache index detected, invalidating texcache files.");
+    scriptfile_close(script);
+    texcache_invalidate();
+    return -2;
 }
 
 // Read from on-disk texcache or its in-memory cache.
@@ -915,14 +925,14 @@ void texcache_setupmemcache(void)
     if (error || !texcache.rw_mmap.is_mapped())
     {
         if (error)
-            initprintf("Failed mapping texcache! Error %d (%s).\n", error.value(), error.message().c_str());
+            LOG_F(ERROR, "Failed mapping texcache! Error %d: %s", error.value(), error.message().c_str());
 
         texcache_clearmemcache();
         return;
     }
     else
     {
-        initprintf("Mapped %d byte texcache\n", (int)texcache.rw_mmap.length());
+        LOG_F(INFO, "Mapped %d byte texcache", (int)texcache.rw_mmap.length());
     }
 }
 

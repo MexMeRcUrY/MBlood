@@ -20,7 +20,11 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
+
+#ifndef BLOOD_COMMON_GAME_H
+#define BLOOD_COMMON_GAME_H
 #pragma once
+
 #include "baselayer.h"
 #include "build.h"
 #include "cache1d.h"
@@ -148,11 +152,15 @@ kNetGameFlagSkillIssue          =  1 << 2,
 kNetGameFlagNoTeamColors        =  1 << 3,
 kNetGameFlagLimitMinutes        =  1 << 4,
 kNetGameFlagLimitFrags          =  1 << 5,
-kNetGameFlagLimit5              =  1 << 6,
-kNetGameFlagLimit10             =  1 << 7,
-kNetGameFlagLimit20             =  1 << 8,
-kNetGameFlagLimit50             =  1 << 9,
-kNetGameFlagLimit100            = 1 << 10,
+kNetGameFlagHideWeaponsCloak    =  1 << 6,
+kNetGameFlagHideWeaponsAlways   =  1 << 7,
+
+kNetGameFlagLimitBase           =  8, // this bit range stores our limit value (0-255)
+kNetGameFlagLimitMask           =  1 << 8|1 << 9|1 << 10|1 << 11|1 << 12|1 << 13|1 << 14|1 << 15,
+
+kNetGameFlagSpawnSmart          =  1 << 16,
+kNetGameFlagSpawnDist           =  1 << 17,
+
 };
 
 // MEDIUM /////////////////////////////////////////////////////
@@ -1053,3 +1061,4 @@ public:
     }
 };
 
+#endif

@@ -43,9 +43,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 // g_grpNamePtr can ONLY point to a malloc'd block (length BMAX_PATH)
 char *g_grpNamePtr = NULL;
-//Game search paths
-char g_BloodCrypticPath[BMAX_PATH] = { 0 };
-char g_BloodPath[BMAX_PATH] = { 0 };
 
 void clearGrpNamePtr(void)
 {
@@ -55,7 +52,7 @@ void clearGrpNamePtr(void)
 
 const char *G_DefaultGrpFile(void)
 {
-    return "notblood.pk3";
+    return APPBASENAME ".pk3";
 }
 
 const char *G_DefaultDefFile(void)
@@ -137,7 +134,7 @@ void G_ExtInit(void)
             i = addsearchpath(CommandPaths->str);
             if (i < 0)
             {
-                initprintf("Failed adding %s for game data: %s\n", CommandPaths->str,
+                LOG_F(ERROR, "Failed adding %s for game data: %s", CommandPaths->str,
                            i==-1 ? "not a directory" : "no such directory");
             }
 
@@ -185,9 +182,9 @@ static int32_t G_TryLoadingGrp(char const * const grpfile)
     int32_t i;
 
     if ((i = initgroupfile(grpfile)) == -1)
-        initprintf("Warning: could not find main data file \"%s\"!\n", grpfile);
+        LOG_F(WARNING, "Could not find main data file \"%s\"!", grpfile);
     else
-        initprintf("Using \"%s\" as main game data file.\n", grpfile);
+        LOG_F(INFO, "Using \"%s\" as main game data file.", grpfile);
 
     return i;
 }
@@ -241,7 +238,7 @@ void G_LoadGroups(int32_t autoload)
         {
             clearDefNamePtr();
             g_defNamePtr = dup_filename(tmpptr);
-            initprintf("Using \"%s\" as definitions file\n", g_defNamePtr);
+            LOG_F(INFO, "Using \"%s\" as definitions file", g_defNamePtr);
         }
     }
 
@@ -261,11 +258,11 @@ void G_LoadGroups(int32_t autoload)
         s = CommandGrps->next;
 
         if ((j = initgroupfile(CommandGrps->str)) == -1)
-            initprintf("Could not find file \"%s\".\n", CommandGrps->str);
+            LOG_F(WARNING, "Could not find file \"%s\".", CommandGrps->str);
         else
         {
             g_groupFileHandle = j;
-            initprintf("Using file \"%s\" as game data.\n", CommandGrps->str);
+            LOG_F(INFO, "Using file \"%s\" as game data.", CommandGrps->str);
             if (autoload)
                 G_DoAutoload(CommandGrps->str);
         }
@@ -277,55 +274,34 @@ void G_LoadGroups(int32_t autoload)
     pathsearchmode = bakpathsearchmode;
 }
 
-#ifndef EDUKE32_TOUCH_DEVICES
-#if defined __linux__ || defined EDUKE32_BSD
-static void Blood_Add_GOG_OUWB_Linux(const char * path)
-{
-    char buf[BMAX_PATH];
-
-    Bsnprintf(buf, sizeof(buf), "%s/data", path);
-    addsearchpath(buf);
-}
-#endif
-
-#if defined EDUKE32_OSX || defined __linux__ || defined EDUKE32_BSD
-static void Blood_AddSteamPaths(const char *basepath)
-{
-    char buf[BMAX_PATH];
-
-    // Blood: Fresh Supply - Steam
-    Bsnprintf(buf, sizeof(buf), "%s/steamapps/common/Blood", basepath);
-    addsearchpath(buf);
-
-    // Blood: One Unit Whole Blood - Steam
-    Bsnprintf(buf, sizeof(buf), "%s/steamapps/common/One Unit Whole Blood", basepath);
-    addsearchpath(buf);
-}
-#endif
-#endif
-
 void G_AddSearchPaths(void)
 {
 #ifndef EDUKE32_TOUCH_DEVICES
 #if defined __linux__ || defined EDUKE32_BSD
     char buf[BMAX_PATH];
     char *homepath = Bgethomedir();
+    const char *xdg_docs_path = getenv("XDG_DOCUMENTS_DIR");
+    const char *xdg_config_path = getenv("XDG_CONFIG_HOME");
 
-    Bsnprintf(buf, sizeof(buf), "%s/.steam/steam", homepath);
-    Blood_AddSteamPaths(buf);
+    if (xdg_config_path) {
+        Bsnprintf(buf, sizeof(buf), "%s/" APPBASENAME, xdg_config_path);
+        addsearchpath(buf);
+    }
 
-    Bsnprintf(buf, sizeof(buf), "%s/.steam/steam/steamapps/libraryfolders.vdf", homepath);
-    Paths_ParseSteamLibraryVDF(buf, Blood_AddSteamPaths);
-
-    // Blood: One Unit Whole Blood - GOG.com
-    Bsnprintf(buf, sizeof(buf), "%s/GOG Games/Blood One Unit Whole Blood", homepath);
-    Blood_Add_GOG_OUWB_Linux(buf);
-    Paths_ParseXDGDesktopFilesFromGOG(homepath, "Blood_One_Unit_Whole_Blood", Blood_Add_GOG_OUWB_Linux);
+    if (xdg_docs_path) {
+        Bsnprintf(buf, sizeof(buf), "%s/" APPNAME, xdg_docs_path);
+        addsearchpath(buf);
+    }
+    else {
+        Bsnprintf(buf, sizeof(buf), "%s/Documents/" APPNAME, homepath);
+        addsearchpath(buf);
+    }
 
     Xfree(homepath);
 
-    addsearchpath("/usr/share/games/notblood");
-    addsearchpath("/usr/local/share/games/notblood");
+    addsearchpath("/usr/share/games/" APPBASENAME);
+    addsearchpath("/usr/local/share/games/" APPBASENAME);
+    addsearchpath("/app/extensions/extra");
 #elif defined EDUKE32_OSX
     char buf[BMAX_PATH];
     int32_t i;
@@ -334,16 +310,7 @@ void G_AddSearchPaths(void)
 
     for (i = 0; i < 2; i++)
     {
-        Bsnprintf(buf, sizeof(buf), "%s/Steam", support[i]);
-        Blood_AddSteamPaths(buf);
-
-        Bsnprintf(buf, sizeof(buf), "%s/Steam/steamapps/libraryfolders.vdf", support[i]);
-        Paths_ParseSteamLibraryVDF(buf, Blood_AddSteamPaths);
-    }
-
-    for (i = 0; i < 2; i++)
-    {
-        Bsnprintf(buf, sizeof(buf), "%s/NotBlood", support[i]);
+        Bsnprintf(buf, sizeof(buf), "%s/" APPNAME, support[i]);
         addsearchpath(buf);
     }
 
@@ -352,90 +319,8 @@ void G_AddSearchPaths(void)
         Xfree(applications[i]);
         Xfree(support[i]);
     }
-#elif defined (_WIN32)
-    char buf[BMAX_PATH] = {0};
-    DWORD bufsize;
-    bool found = false;
-
-    // Blood: One Unit Whole Blood - Steam
-    bufsize = sizeof(buf);
-    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 299030)", "InstallLocation", buf, &bufsize))
-    {
-        addsearchpath(buf);
-        strncpy(g_BloodPath, buf, sizeof(buf));
-        found = true;
-    }
-
-    // Blood: One Unit Whole Blood - GOG.com
-    bufsize = sizeof(buf);
-    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\GOG.com\Games\1207658856)", "path", buf, &bufsize))
-    {
-        addsearchpath(buf);
-        strncpy(g_BloodPath, buf, sizeof(buf));
-        found = true;
-    }
-    bufsize = sizeof(buf);
-    if (!found && Paths_ReadRegistryValue("SOFTWARE\\GOG.com\\GOGONEUNITONEBLOOD", "PATH", buf, &bufsize))
-    {
-        addsearchpath(buf);
-        strncpy(g_BloodPath, buf, sizeof(buf));
-        found = true;
-    }
-
-    // Blood: Fresh Supply - Steam
-    bufsize = sizeof(buf);
-    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1010750)", "InstallLocation", buf, &bufsize))
-    {
-        char * const suffix = buf + bufsize - 1;
-        DWORD const remaining = sizeof(buf) - bufsize;
-
-        addsearchpath(buf);
-        strncpy(g_BloodPath, buf, sizeof(buf));
-        strncpy(suffix, "/addons/Cryptic Passage", remaining);
-        addsearchpath(buf);
-        strncpy(g_BloodCrypticPath, buf, sizeof(buf));
-        found = true;
-    }
-
-    // Blood: Fresh Supply - GOG.com
-    bufsize = sizeof(buf);
-    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\GOG.com\Games\1374469660)", "path", buf, &bufsize))
-    {
-        char * const suffix = buf + bufsize - 1;
-        DWORD const remaining = sizeof(buf) - bufsize;
-
-        addsearchpath(buf);
-        strncpy(g_BloodPath, buf, sizeof(buf));
-        strncpy(suffix, "/addons/Cryptic Passage", remaining);
-        addsearchpath(buf);
-        strncpy(g_BloodCrypticPath, buf, sizeof(buf));
-        found = true;
-    }
 #endif
 #endif
-}
-
-void G_RemoveSearchPaths(const char* gamePath)
-{
-    removesearchpath(gamePath);
-}
-
-char const* G_GetGamePath(Games_t game)
-{
-    const char* path;
-    switch (game)
-    {
-    case kGame_Blood:
-        path = g_BloodPath;
-        break;
-    case kGame_Cryptic:
-        path = g_BloodCrypticPath;
-        break;
-    default:
-        path = g_rootDir;
-    }
-    
-    return path;
 }
 
 void G_CleanupSearchPaths(void)
@@ -501,7 +386,7 @@ void G_LoadGroupsInDir(const char *dirname)
         for (rec=fnlist.findfiles; rec; rec=rec->next)
         {
             Bsnprintf(buf, sizeof(buf), "%s/%s", dirname, rec->name);
-            initprintf("Using group file \"%s\".\n", buf);
+            LOG_F(INFO, "Using group file \"%s\".", buf);
             initgroupfile(buf);
         }
 

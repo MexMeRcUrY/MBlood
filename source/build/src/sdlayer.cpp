@@ -102,6 +102,7 @@ char modechange=1;
 char offscreenrendering=0;
 char videomodereset = 0;
 int32_t nofog=0;
+char g_controllerSupportDisabled;
 #ifndef EDUKE32_GLES
 static uint16_t sysgamma[3][256];
 #endif
@@ -1079,27 +1080,30 @@ int32_t initinput(void(*hotplugCallback)(void) /*= nullptr*/)
         Bstrncpyz(g_keyNameTable[keytranslation[i]], SDL_GetKeyName(SDL_SCANCODE_TO_KEYCODE(i)), sizeof(g_keyNameTable[0]));
     }
 
+    if (!g_controllerSupportDisabled)
+    {
 #if SDL_MAJOR_VERSION >= 2
-    if (!SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC))
+        if (!SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER))
 #else
-    if (!SDL_InitSubSystem(SDL_INIT_JOYSTICK))
+        if (!SDL_InitSubSystem(SDL_INIT_JOYSTICK))
 #endif
-        joyScanDevices();
+            joyScanDevices();
 
 #if SDL_VERSION_ATLEAST(2, 0, 9)
-    if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 9))
-    {
-        if (joystick.flags & JOY_RUMBLE)
+        if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 9))
         {
-            switch (joystick.flags & JOY_RUMBLE)
+            if (joystick.flags & JOY_RUMBLE)
             {
-            case JOY_RUMBLE:
-                VLOG_F(LOG_INPUT, "Controller supports rumble.");
-                break;
+                switch (joystick.flags & JOY_RUMBLE)
+                {
+                case JOY_RUMBLE:
+                    VLOG_F(LOG_INPUT, "Controller supports rumble.");
+                    break;
+                }
             }
         }
-    }
 #endif
+    }
 
     return 0;
 }
@@ -2176,6 +2180,39 @@ void videoShowFrame(int32_t w)
 
         MicroProfileFlip();
 
+#if 0
+        if (glinfo.reset_notification)
+        {
+            static const auto glGetGraphicsReset = glGetGraphicsResetStatus ? glGetGraphicsResetStatus : glGetGraphicsResetStatusKHR;
+            auto status = glGetGraphicsReset();
+            if (status != GL_NO_ERROR)
+            {
+                do
+                {
+                    switch (status)
+                    {
+                    case GL_GUILTY_CONTEXT_RESET:
+                        LOG_F(ERROR, "OPENGL CONTEXT LOST: GUILTY!");
+                        break;
+                    case GL_INNOCENT_CONTEXT_RESET:
+                        LOG_F(ERROR, "OPENGL CONTEXT LOST: INNOCENT!");
+                        break;
+                    case GL_UNKNOWN_CONTEXT_RESET:
+                        LOG_F(ERROR, "OPENGL CONTEXT LOST!");
+                        break;
+                    }
+                } while ((status = glGetGraphicsReset()) != GL_NO_ERROR);
+
+                videoResetMode();
+
+                if (videoSetGameMode(fullscreen, xres, yres, bpp, upscalefactor))
+                {
+                    LOG_F(ERROR, "Failed to reset video mode after lost OpenGL context; terminating.");
+                    Bexit(EXIT_FAILURE);
+                }
+            }
+        }
+#endif
         // attached overlays and streaming hooks tend to change the GL state without setting it back
 
         if (w != -1)
@@ -2808,14 +2845,6 @@ int32_t handleevents_pollsdl(void)
 }
 #endif
 
-/**
- * Returns true after at least 100ms have passed to prevent bottlenecking the handleevents() function.
- */
-static INLINE bool shouldPollGlResetStatus(uint64_t lastGlResetStatusTicks)
-{
-    return timerGetNanoTicks() - lastGlResetStatusTicks >= (timerGetNanoTickRate() / 10);
-}
-
 int32_t handleevents(void)
 {
 #ifdef __ANDROID__
@@ -2888,42 +2917,6 @@ int32_t handleevents(void)
 
     inputchecked = 0;
     timerUpdateClock();
-
-#ifdef USE_OPENGL
-    static uint64_t lastGlResetStatusTicks = 0;
-    if (!nogl && glinfo.reset_notification && shouldPollGlResetStatus(lastGlResetStatusTicks))
-    {
-        lastGlResetStatusTicks = timerGetNanoTicks();
-        static const auto glGetGraphicsReset = glGetGraphicsResetStatusKHR ? glGetGraphicsResetStatusKHR : glGetGraphicsResetStatus;
-        auto status = glGetGraphicsReset();
-        if (status != GL_NO_ERROR)
-        {
-            do
-            {
-                switch (status)
-                {
-                    case GL_GUILTY_CONTEXT_RESET:
-                        LOG_F(ERROR, "OPENGL CONTEXT LOST: GUILTY!");
-                        break;
-                    case GL_INNOCENT_CONTEXT_RESET:
-                        LOG_F(ERROR, "OPENGL CONTEXT LOST: INNOCENT!");
-                        break;
-                    case GL_UNKNOWN_CONTEXT_RESET:
-                        LOG_F(ERROR, "OPENGL CONTEXT LOST!");
-                        break;
-                }
-            } while ((status = glGetGraphicsReset()) != GL_NO_ERROR);
-
-            videoResetMode();
-
-            if (videoSetGameMode(fullscreen,xres,yres,bpp,upscalefactor))
-            {
-                LOG_F(ERROR, "Failed to reset video mode after lost OpenGL context; terminating.");
-                Bexit(EXIT_FAILURE);
-            }
-        }
-    }
-#endif
 
     if (!frameplace && sdl_resize.x)
     {

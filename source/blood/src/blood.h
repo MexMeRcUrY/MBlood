@@ -72,7 +72,11 @@ extern int gCacheMiss;
 extern int gDoQuickSave;
 extern int gMenuPicnum;
 
+extern bool gNetRetry;
+
 extern int gMultiModeInit;
+extern int gMultiLength;
+extern int gMultiLimit;
 extern int gMultiEpisodeInit;
 extern int gMultiLevelInit;
 extern int gMultiDiffInit;
