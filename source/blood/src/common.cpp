@@ -43,6 +43,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 // g_grpNamePtr can ONLY point to a malloc'd block (length BMAX_PATH)
 char *g_grpNamePtr = NULL;
+//Game search paths
+char g_BloodCrypticPath[BMAX_PATH] = { 0 };
+char g_BloodPath[BMAX_PATH] = { 0 };
 
 void clearGrpNamePtr(void)
 {
@@ -366,6 +369,29 @@ void G_AddPath(const char *buffer)
         return;
     }
     CommandPaths = s;
+}
+
+void G_RemoveSearchPaths(const char* gamePath)
+{
+    removesearchpath(gamePath);
+}
+
+char const* G_GetGamePath(Games_t game)
+{
+    const char* path;
+    switch (game)
+    {
+    case kGame_Blood:
+        path = g_BloodPath;
+        break;
+    case kGame_Cryptic:
+        path = g_BloodCrypticPath;
+        break;
+    default:
+        path = g_rootDir;
+    }
+
+    return path;
 }
 
 //////////

@@ -139,3 +139,5 @@ project.xcworkspace/
 /source/sdltheora/Win32/Build/SDLtheora/Release/SDLtheora.tlog/sdltheora.lastbuildstate
 /source/sdltheora/Win32/Build/SDLtheora/Release/SDLtheora.tlog/CL.read.1.tlog
 /source/sdltheora/Win32/Build/SDLtheora/Release/SDLtheora.tlog/CL.command.1.tlog
+/source/sdltheora/x64/Build/sdltheora/Debug
+/platform/Windows/lib/64
