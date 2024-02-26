@@ -322,6 +322,65 @@ void G_AddSearchPaths(void)
         Xfree(applications[i]);
         Xfree(support[i]);
     }
+#elif defined (_WIN32)
+    char buf[BMAX_PATH] = { 0 };
+    DWORD bufsize;
+    bool found = false;
+
+    // Blood: One Unit Whole Blood - Steam
+    bufsize = sizeof(buf);
+    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 299030)", "InstallLocation", buf, &bufsize))
+    {
+        addsearchpath(buf);
+        strncpy(g_BloodPath, buf, sizeof(buf));
+        found = true;
+    }
+
+    // Blood: One Unit Whole Blood - GOG.com
+    bufsize = sizeof(buf);
+    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\GOG.com\Games\1207658856)", "path", buf, &bufsize))
+    {
+        addsearchpath(buf);
+        strncpy(g_BloodPath, buf, sizeof(buf));
+        found = true;
+    }
+    bufsize = sizeof(buf);
+    if (!found && Paths_ReadRegistryValue("SOFTWARE\\GOG.com\\GOGONEUNITONEBLOOD", "PATH", buf, &bufsize))
+    {
+        addsearchpath(buf);
+        strncpy(g_BloodPath, buf, sizeof(buf));
+        found = true;
+    }
+
+    // Blood: Fresh Supply - Steam
+    bufsize = sizeof(buf);
+    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1010750)", "InstallLocation", buf, &bufsize))
+    {
+        char* const suffix = buf + bufsize - 1;
+        DWORD const remaining = sizeof(buf) - bufsize;
+
+        addsearchpath(buf);
+        strncpy(g_BloodPath, buf, sizeof(buf));
+        strncpy(suffix, "/addons/Cryptic Passage", remaining);
+        addsearchpath(buf);
+        strncpy(g_BloodCrypticPath, buf, sizeof(buf));
+        found = true;
+    }
+
+    // Blood: Fresh Supply - GOG.com
+    bufsize = sizeof(buf);
+    if (!found && Paths_ReadRegistryValue(R"(SOFTWARE\GOG.com\Games\1374469660)", "path", buf, &bufsize))
+    {
+        char* const suffix = buf + bufsize - 1;
+        DWORD const remaining = sizeof(buf) - bufsize;
+
+        addsearchpath(buf);
+        strncpy(g_BloodPath, buf, sizeof(buf));
+        strncpy(suffix, "/addons/Cryptic Passage", remaining);
+        addsearchpath(buf);
+        strncpy(g_BloodCrypticPath, buf, sizeof(buf));
+        found = true;
+    }
 #endif
 #endif
 }
