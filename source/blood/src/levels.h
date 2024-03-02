@@ -207,3 +207,4 @@ void levelRestart(void);
 int levelGetMusicIdx(const char *str);
 bool levelTryPlayMusic(int nEpisode, int nlevel, bool bSetLevelSong = false);
 void levelTryPlayMusicOrNothing(int nEpisode, int nLevel);
+bool playCinematic(const char* episodeCutscene, const char* cutsceneWavPath, int cutsceneWavRsrcID, CinematicFormats& outFormatFound);

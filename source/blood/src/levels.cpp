@@ -142,8 +142,10 @@ void showWaitingScreenForCoop(void)
     }
 }
 
-bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, CinematicFormats &formatFound) {
+bool playCinematic(const char* episodeCutscene, const char* cutsceneWavPath, int cutsceneWavRsrcID, CinematicFormats &formatFound) {
     // get filename
+    char* fullPath = new char[MAX_PATH];
+    memset(fullPath, 0, MAX_PATH);
     char* cs = new char[strlen(episodeCutscene)];
     strcpy(cs, episodeCutscene);
     //uniform path in case multiplatform
@@ -156,7 +158,12 @@ bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, Cinem
     }
     //file name with extension
     char* fileName = strrchr(cs, '\\');
-    if (fileName == NULL) return false;
+    //if fail to substract subdirectories use the file name as it comes.
+    if (fileName == NULL)
+    {
+        fileName = new char[strlen(episodeCutscene)];
+        strcpy(fileName, episodeCutscene);
+    }
     //remove first back slash
     if (fileName != NULL && fileName[0] == '\\')
     {
@@ -168,7 +175,7 @@ bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, Cinem
     if (lastExt == NULL) return false;
     if (lastExt != NULL)
         *lastExt = '\0';
-    //const char* mainDir = G_GetGamePath(Games_t::kGame_Blood);
+
     for (int i = 0; i < 4; i++) //loop the 3 options: local path, auto load path, game dir path
     {
         const char* CUR_DIR;
@@ -188,14 +195,12 @@ bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, Cinem
             memset(mov, 0, MAX_PATH);
             CUR_DIR = G_GetGamePath(Games_t::kGame_Blood);
             strcat(mov, CUR_DIR);
-            strcat(mov, "/MOvie");
+            strcat(mov, "/Movie");
             CUR_DIR = mov;
             break;
 
         }
-        //fnlist_t fnl = FNLIST_INITIALIZER;
-        //fnlist_clearnames(&fnl);
-        //fnlist_getnames(&fnl, "/", "*.ogv", 0, 0);
+
         bool bkpPathsearchmode = pathsearchmode;
         pathsearchmode = 1; // makes the klistpath only look into the passed directory.
         BUILDVFS_FIND_REC* ogvFilesList = klistpath(CUR_DIR, "*.ogv", BUILDVFS_FIND_FILE);
@@ -211,10 +216,10 @@ bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, Cinem
                 strcat(fullPath, CUR_DIR);
                 strcat(fullPath, ogvFile);
                 formatFound = CinematicFormats::OGV;
-                return true;
             }
 
         }
+
         BUILDVFS_FIND_REC* smkFilesList = klistpath(CUR_DIR, "*.SMK", BUILDVFS_FIND_FILE);
 
         pINIChain = NULL;
@@ -228,53 +233,44 @@ bool getCutScenePathAndFormat(const char* episodeCutscene, char *fullPath, Cinem
                 strcat(fullPath, CUR_DIR);
                 strcat(fullPath, smkFile);
                 formatFound = SMK;
-                return true;
             }
 
         }
+
+        //try movies in game Data path
+        bool moviePlayed = false;
+        char* smkMovieFullPath = new char[MAX_PATH];
+        memset(smkMovieFullPath, 0, MAX_PATH);
+        char* ogvMovieFullPath = new char[MAX_PATH];
+        memset(ogvMovieFullPath, 0, MAX_PATH);
+        
+
+        switch (formatFound)
+        {
+        case CinematicFormats::SMK:
+            strcpy(smkMovieFullPath, fullPath);
+            break;
+        case CinematicFormats::OGV:
+            strcpy(ogvMovieFullPath, fullPath);
+            break;
+        }
+        if (!moviePlayed)
+        {
+            moviePlayed = credPlayTheora(ogvMovieFullPath);
+        }
+        if (!moviePlayed)
+        {
+            moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
+        }
+
+        if (moviePlayed)
+        {
+            showWaitingScreenForCoop();
+            return true;
+        }
     }
     return false; 
-   // char* cutscene = new char[strlen(episodeCutscene)];
-   // strcpy(cutscene, episodeCutscene);
-   // const char *gameDir = G_GetGamePath(kGame_Blood);
-   // const char *rootGameDir = G_GetGamePath(GAMESCOUNT);
-
-   // strcpy(ogvMovieFullPath, gameDir);
-   // strcpy(smkMovieFullPath, gameDir);
-   // strcpy(rootDirMoveFullPath, rootGameDir);
-   // const char* cs = cutscene;
-   // const int last = (int) '//' ;
-   // const char* filename =  strrchr(cs, last);
-   ////get
-   // 
-   // //strip the drive letter (OUWB)
-   // char*  driveLetter = strrchr(cutscene, ':');
-   // if (driveLetter)
-   // {
-   //     size_t pathSize = strlen(driveLetter);
-   //     cutscene[0] = 0;
-   //     cutscene = new char[pathSize - 1];
-   //     memcpy(cutscene, &driveLetter[1], pathSize);
-   //     cutscene[pathSize - 1] = '\0';
-   //     strcat(smkMovieFullPath, cutscene);
-   //     strcat(ogvMovieFullPath, cutscene);
-   //     strcat(rootDirMoveFullPath, cutscene);
-
-   // }
-   // else
-   // {
-   //     strcat(smkMovieFullPath, "\\");
-   //     strcat(smkMovieFullPath, cutscene);
-   //     strcat(ogvMovieFullPath, "\\");
-   //     strcat(ogvMovieFullPath, cutscene);
-   //     strcat(rootDirMoveFullPath, "\\");
-   //     strcat(rootDirMoveFullPath, cutscene);
-
-   // }
-   // //Freshsupply files
-   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 1] = 'v';
-   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 2] = 'g';
-   //     ogvMovieFullPath[strlen(ogvMovieFullPath) - 3] = 'o';
+   
 }
 ///////
 void playCutscene(int nEpisode, int nSceneType)
@@ -330,37 +326,12 @@ void playCutscene(int nEpisode, int nSceneType)
         break;
 
     }
-    char* fullpath = new char[MAX_PATH];
-    memset(fullpath, 0, MAX_PATH);
+    char* fullpathFound = new char[MAX_PATH];
+    memset(fullpathFound, 0, MAX_PATH);
     CinematicFormats formatFound = CINEMATICEXTCOUNT;
-    bool moviePlayed = false;
-    bool filefound = false;
-    filefound = getCutScenePathAndFormat(cutscenePath, fullpath, formatFound);
-    if (filefound)
-    {
-        switch(formatFound)
-        {
-        case SMK:
-            strcpy(smkMovieFullPath, fullpath);
-            break;
-        case CinematicFormats::OGV:
-            strcpy(ogvMovieFullPath, fullpath);
-            break;
-        }
-        
-    }
-    //try movies in game Data path
-    if (!moviePlayed)
-    {
-        moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
-        showWaitingScreenForCoop();
-    }
+    playCinematic(cutscenePath, cutsceneWavPath, cutsceneWavRsrcID, formatFound);
 
-    if (!moviePlayed)
-    {
-        moviePlayed = credPlayTheora(ogvMovieFullPath);
-        showWaitingScreenForCoop();
-    }
+   
     scrSetDac();
     viewResizeView(gViewSize);
     credReset();

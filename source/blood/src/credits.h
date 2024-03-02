@@ -27,5 +27,4 @@ void credReset(void);
 char credPlaySmk(const char *pzSMK, const char *pzWAV, int nWAV);
 ///////
 char credPlayTheora(const char* ogvideo);
-//bool getCutScenePathAndFormat(const char *episodeCutscene, char *fullPath, CinematicFormats *formatFound);
 ///////

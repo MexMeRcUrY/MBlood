@@ -102,8 +102,8 @@ char DoUnFade(int nTicks)
 void credLogosDos(void)
 {
     //TODO:
-    char* fullpath = new char[BMAX_PATH];
-    memset(fullpath, 0, MAX_PATH);
+    char* fullpathFound = new char[BMAX_PATH];
+    memset(fullpathFound, 0, MAX_PATH);
     bool moviePlayed = false;
     bool filefound = false;
     char* smkMovieFullPath = new char[MAX_PATH];
@@ -117,50 +117,33 @@ void credLogosDos(void)
     char* cutscenePath = new char[MAX_PATH];
     char* cutsceneWavPath = new char[MAX_PATH];
     int   cutsceneWavRsrcID = 0;
-    strcpy(cutscenePath,"MONOLITH.SMK");
     CinematicFormats formatFound = CINEMATICEXTCOUNT;
-    filefound = 0;// getCutScenePathAndFormat(cutscenePath, fullpath, &formatFound);
-    if (filefound)
-    {
-        switch (formatFound)
-        {
-        case SMK:
-            strcpy(smkMovieFullPath, fullpath);
-            break;
-        case CinematicFormats::OGV:
-            strcpy(ogvMovieFullPath, fullpath);
-            break;
-        }
+    
 
-    }
-    //try movies in game Data path
-    if (!moviePlayed)
-    {
-        moviePlayed = credPlaySmk(smkMovieFullPath, cutsceneWavPath, cutsceneWavRsrcID);
-    }
-
-    if (!moviePlayed)
-    {
-        moviePlayed = credPlayTheora(ogvMovieFullPath);
-
-    }
-   /* char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
+    char bShift = keystatus[sc_LeftShift] | keystatus[sc_RightShift];
     if (bShift || !gCutScenes)
         return;
 
     videoClearScreen(0);
     DoUnFade(1);
 
-    char* smkMovieFullPath = new char[MAX_PATH];
-    char* ogvMovieFullPath = new char[MAX_PATH];
-    char* nBloodMovieFullPath = new char[MAX_PATH];
-    char logoVideo[] = "movie\\MONOLITH.SMK";
-    getCutScenePath(logoVideo,CinematicFormats);
-    bool moviePlayed = false;
 
-    moviePlayed = credPlaySmk("LOGO.SMK", "logo811m.wav", 300);
+
+    //moviePlayed = credPlaySmk("LOGO.SMK", "logo811m.wav", 300);
+    //if (!moviePlayed)
+    //    moviePlayed = credPlayTheora(ogvMovieFullPath);
+    strcpy(cutscenePath, "LOGO.SMK");
+    cutsceneWavRsrcID = 300;
+    strcpy(cutsceneWavPath, "logo811m.wav");
+    moviePlayed = playCinematic(cutscenePath, cutsceneWavPath, cutsceneWavRsrcID, formatFound);
+    memset(fullpathFound, 0, MAX_PATH);
+    
     if (!moviePlayed)
-        moviePlayed = credPlayTheora(ogvMovieFullPath);
+    {
+        strcpy(cutscenePath, "MONOLITH.SMK"); //try fresh supply movie
+        moviePlayed = playCinematic(cutscenePath, cutsceneWavPath, cutsceneWavRsrcID, formatFound);
+        memset(fullpathFound, 0, MAX_PATH);
+    }
     if (!moviePlayed)
     {
         rotatesprite(160 << 16, 100 << 16, 65536, 0, 2050, 0, 0, 0x4a, 0, 0, xdim - 1, ydim - 1);
@@ -174,11 +157,12 @@ void credLogosDos(void)
     }
 
     credReset();
-    char gtiVideo[] = "movie\\GTI.SMK";
-    getCutScenePath(gtiVideo, nBloodMovieFullPath, ogvMovieFullPath, smkMovieFullPath);
-    moviePlayed = credPlaySmk("GTI.SMK", "gti.wav", 301);
-    if (!moviePlayed)
-        moviePlayed = credPlayTheora(ogvMovieFullPath);
+   
+    //moviePlayed = credPlaySmk("GTI.SMK", "gti.wav", 301);
+    strcpy(cutscenePath, "GTI.SMK");
+    cutsceneWavRsrcID = 301;
+    strcpy(cutsceneWavPath, "gti.wav");
+    moviePlayed = playCinematic(cutscenePath, cutsceneWavPath, cutsceneWavRsrcID, formatFound);
     if (!moviePlayed)
     {
         rotatesprite(160 << 16, 100 << 16, 65536, 0, 2052, 0, 0, 0x0a, 0, 0, xdim - 1, ydim - 1);
@@ -198,7 +182,7 @@ void credLogosDos(void)
     sndStartSample("THUNDER2", 128, -1);
     sndPlaySpecialMusicOrNothing(MUS_INTRO);
     Wait(360);
-    sndFadeSong(4000);*/
+    sndFadeSong(4000);
 }
 
 void credReset(void)
