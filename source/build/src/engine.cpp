@@ -130,7 +130,7 @@ int32_t oxyaspect = -1;
 // r_usenewaspect is the cvar, newaspect_enable to trigger the new behaviour in the code
 int32_t r_usenewaspect = 1, newaspect_enable=0;
 uint32_t r_screenxy = 0;
-int32_t r_mirrormode = 0, r_mirrormodelock = 0;
+int32_t r_mirrormode = 0, r_mirrormodemulti = 0;
 
 int32_t r_rotatespriteinterp = 2;
 int32_t r_rotatespriteinterpquantize = 0;
@@ -10832,7 +10832,7 @@ static FORCE_INLINE int32_t have_maptext(void)
 static int enginePrepareLoadBoard(buildvfs_kfd fil, vec3_t *dapos, int16_t *daang, int16_t *dacursectnum)
 {
     initspritelists();
-#if USE_MIMALLOC != 0
+#ifdef USE_MIMALLOC
     mi_collect(true);
 #endif
     DO_FREE_AND_NULL(reachablesectors);

@@ -393,7 +393,7 @@ CGameMenuItemChain itemDifficulty2("PINK ON THE INSIDE", 1, 0, 75, 320, 1, NULL,
 CGameMenuItemChain itemDifficulty3("LIGHTLY BROILED", 1, 0, 95, 320, 1, NULL, -1, SetDifficultyAndStart, 2);
 CGameMenuItemChain itemDifficulty4("WELL DONE", 1, 0, 115, 320, 1, NULL, -1, SetDifficultyAndStart, 3);
 CGameMenuItemChain itemDifficulty5("EXTRA CRISPY", 1, 0, 135, 320, 1, 0, -1, SetDifficultyAndStart, 4);
-CGameMenuItemChain itemDifficultyCustom("< CUSTOM >", 1, 0, 155, 320, 1, &menuCustomDifficulty, -1, NULL, 0, 8);
+CGameMenuItemChain itemDifficulty6("< CUSTOM >", 1, 0, 155, 320, 1, &menuCustomDifficulty, -1, NULL, 0, 8);
 
 CGameMenuItemTitle itemCustomDifficultyTitle("CUSTOM", 1, 160, 20, 2038);
 CGameMenuItemSlider itemCustomDifficultyEnemyQuantity("ENEMIES QUANTITY:", 3, 66, 40, 180, 2, 0, 4, 1, NULL, -1, -1);
@@ -1237,7 +1237,7 @@ void SetupDifficultyMenu(void)
     menuDifficulty.Add(&itemDifficulty3, true);
     menuDifficulty.Add(&itemDifficulty4, false);
     menuDifficulty.Add(&itemDifficulty5, false);
-    menuDifficulty.Add(&itemDifficultyCustom, false);
+    menuDifficulty.Add(&itemDifficulty6, false);
     menuDifficulty.Add(&itemBloodQAV, false);
 
     menuCustomDifficulty.Add(&itemCustomDifficultyTitle, false);
@@ -2526,10 +2526,7 @@ void SetLevelCompleteTime(CGameMenuItemZBool *pItem)
 
 void SetMirrorMode(CGameMenuItemZCycle *pItem)
 {
-    if (pItem == NULL)
-        pItem = &itemOptionsDisplayViewMirrorMode;
-    if (!r_mirrormodelock)
-        r_mirrormode = pItem->m_nFocus % ARRAY_SSIZE(pzMirrorModeStrings);
+    r_mirrormode = pItem->m_nFocus % ARRAY_SSIZE(pzMirrorModeStrings);
 }
 
 void SetSlowRoomFlicker(CGameMenuItemZBool *pItem)
@@ -3858,12 +3855,15 @@ void NetworkBrowserAdd(const char *pString, int nPort, const char *pHost, int nC
     char szTemp[64];
     int nSlotEmpty = -1;
 
-    Bsnprintf(szTemp, sizeof(szTemp), "%s:%d (Host: %s, Players: %01d\\%01d)", pString, nPort, pHost, nClientsCur, nClientsMax);
+    Bsnprintf(szTemp, sizeof(szTemp), "%s %d", pString, nPort);
     for (int nSlot = 0; (unsigned)nSlot < ARRAY_SIZE(pItemNetworkBrowserGame); nSlot++)
     {
-        if (!Bstrncmp(szTemp, zNetBrowserGame[nSlot], sizeof(szTemp))) // already exists, don't add to server list
-            return;
-        if (zNetBrowserGame[nSlot][0] == '\0')
+        if (!Bstrncmp(szTemp, zNetBrowserGame[nSlot], Bstrlen(szTemp))) // already exists, update server listing
+        {
+            nSlotEmpty = nSlot;
+            break;
+        }
+        else if (zNetBrowserGame[nSlot][0] == '\0') // listing is new, add to empty slot
         {
             nSlotEmpty = nSlot;
             break;
@@ -3872,6 +3872,7 @@ void NetworkBrowserAdd(const char *pString, int nPort, const char *pHost, int nC
     if (nSlotEmpty < 0) // server list is full, return (WTF!? NOBODY KNOWS ABOUT THIS OBSCURE FORK)
         return;
 
+    Bsnprintf(szTemp, sizeof(szTemp), "%s (Host: %s, Players: %01d\\%01d)", szTemp, pHost, nClientsCur, nClientsMax);
     Bstrncpyz(zNetBrowserGame[nSlotEmpty], szTemp, sizeof(zNetBrowserGame[nSlotEmpty]));
     pItemNetworkBrowserGame[nSlotEmpty]->bCanSelect = 1;
     pItemNetworkBrowserGame[nSlotEmpty]->bEnable = 1;
@@ -3909,7 +3910,7 @@ void NetworkBrowserJoin(CGameMenuItemChain *pItem)
     sndStopSong();
     FX_StopAllSounds();
     UpdateDacs(0, true);
-    Bsscanf(pItem->m_pzText, "%s %d", gNetAddress, &gNetPort);
+    Bsscanf(pItem->m_pzText, "%s %d (", gNetAddress, &gNetPort);
     gNetMode = NETWORK_CLIENT;
     netIRCDeinitialize();
     netInitialize(false);
