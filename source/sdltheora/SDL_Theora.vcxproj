@@ -88,7 +88,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>D:\Backup\Games\Blood\Media-master\SDL_theora_working\SDL_theora\include;$(IncludePath)</IncludePath>
-    <OutDir>D:\Backup\Games\Blood\MexMeRcUrY\platform\Windows\lib\64</OutDir>
+    <OutDir>$(SolutionDir)Build\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(Platform)\Build\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -173,7 +173,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;SDL_THEORA_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\platform\Windows\Include;$(VC_CRT_SourcePath);./include;./include/vpx/;./include/sdl2/;../../source/build/include;../../source/mact/include;../../source/audiolib/include;../../source/glad/include;../../source/libxmp-lite/include;../../source/libxmp-lite/include/libxmp-lite;../../source/voidwrap/include;../../source/mimalloc/include;../../source/imgui/include;../../source/libsmackerdec/include;../../source/hmpplay/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
