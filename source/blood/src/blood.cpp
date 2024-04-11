@@ -613,7 +613,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gDemo.Close();
     netWaitForEveryone(0);
     VanillaModeUpdate();
-    r_mirrormodelock = 0;
+    r_mirrormodemulti = 0;
     if (gGameOptions.nGameType == kGameTypeSinglePlayer)
     {
         if (!(gGameOptions.uGameFlags&kGameFlagContinuing))
@@ -713,12 +713,11 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gRedFlagDropped = false;
         gView = gMe;
         gViewIndex = myconnectindex;
-        r_mirrormodelock = 1;
-        r_mirrormode = 0;
+        r_mirrormodemulti = 4; // set active flag
         if (gGameOptions.uNetGameFlags&kNetGameFlagMirrorHoriz)
-            r_mirrormode |= 1;
+            r_mirrormodemulti |= 1;
         if (gGameOptions.uNetGameFlags&kNetGameFlagMirrorVert)
-            r_mirrormode |= 2;
+            r_mirrormodemulti |= 2;
     }
     if (gameOptions->uGameFlags&kGameFlagContinuing) // if episode is in progress, remember player stats
     {
@@ -1180,6 +1179,7 @@ void LocalKeys(void)
             return;
         case sc_F6:
             keyFlushScans();
+            CONTROL_ClearButton(gamefunc_Quick_Save);
             if (gGameOptions.nGameType == kGameTypeSinglePlayer)
                 DoQuickSave();
             break;
@@ -1190,6 +1190,7 @@ void LocalKeys(void)
             return;
         case sc_F9:
             keyFlushScans();
+            CONTROL_ClearButton(gamefunc_Quick_Load);
             if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && !gGameOptions.bPermaDeath)
                 DoQuickLoad();
             break;
@@ -2179,6 +2180,7 @@ int app_main(int argc, char const * const * argv)
     if (gCustomPalette || gCustomPaletteGrayscale || gCustomPaletteInvert) // load modified palette
         scrCustomizePalette(gCustomPalette % ARRAY_SSIZE(srcCustomPaletteStr), gCustomPaletteCIEDE2000, gCustomPaletteGrayscale, gCustomPaletteInvert);
     scrSetGamma(gGamma);
+    gGameMessageMgr.SetState(gMessageState);
     viewResizeView(gViewSize);
     vsync = videoSetVsync(vsync);
     LOG_F(INFO, "Initializing sound system");

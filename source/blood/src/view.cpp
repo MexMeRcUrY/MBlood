@@ -961,6 +961,8 @@ void viewBackupView(int nPlayer)
     pView->at30 = pPlayer->q16ang;
     pView->at50 = pPlayer->pSprite->x;
     pView->at54 = pPlayer->pSprite->y;
+    if (!VanillaMode())
+        pView->at58 = pPlayer->pSprite->z;
     pView->at5c = xvel[pPlayer->pSprite->index];
     pView->at60 = yvel[pPlayer->pSprite->index];
     pView->at38 = pPlayer->zView;
@@ -980,6 +982,8 @@ void viewCorrectViewOffsets(int nPlayer, vec3_t const *oldpos)
     VIEW *pView = &gPrevView[nPlayer];
     pView->at50 += pPlayer->pSprite->x-oldpos->x;
     pView->at54 += pPlayer->pSprite->y-oldpos->y;
+    if (!VanillaMode())
+        pView->at58 += pPlayer->pSprite->z-oldpos->z;
     pView->at38 += pPlayer->pSprite->z-oldpos->z;
 }
 
@@ -1402,9 +1406,9 @@ void viewDrawPowerUps(PLAYER* pPlayer)
     nPowerActive[1] = pPlayer->pwUpTime[kPwUpReflectShots]; // reflects enemy shots
     nPowerActive[2] = pPlayer->pwUpTime[kPwUpDeathMask]; // invulnerability
     if (powerupCheck(pPlayer, kPwUpTwoGuns) && gGameOptions.bQuadDamagePowerup && !VanillaMode()) // if quad damage is enabled, use quad damage icon from notblood.pk3/TILES099.ART
-        nPowerActive[3] = 0, nPowerActive[4] = pPlayer->pwUpTime[kPwUpTwoGuns]; // quad damage
+        nPowerActive[3] = 0, nPowerActive[4] = !gMatrixMode ? pPlayer->pwUpTime[kPwUpTwoGuns] : 0; // quad damage
     else
-        nPowerActive[3] = pPlayer->pwUpTime[kPwUpTwoGuns], nPowerActive[4] = 0; // guns akimbo
+        nPowerActive[3] = !gMatrixMode ? pPlayer->pwUpTime[kPwUpTwoGuns] : 0, nPowerActive[4] = 0; // guns akimbo
     nPowerActive[5] = pPlayer->pwUpTime[kPwUpShadowCloakUseless]; // shadow cloak
 
     // not in official maps
@@ -3245,6 +3249,7 @@ inline char viewApplyPlayerModel(int *nTile)
 }
 
 LOCATION gPrevSpriteLoc[kMaxSprites];
+static LOCATION gViewSpritePredictLoc;
 
 static void viewApplyDefaultPal(tspritetype *pTSprite, sectortype const *pSector)
 {
@@ -3286,7 +3291,14 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
 
         auto const tsprflags = pTSprite->clipdist;
 
-        if (gViewInterpolate && TestBitString(gInterpolateSprite, nSprite) && !(pTSprite->flags&512))
+        if (gView && (gView->pSprite == &sprite[nSprite]) && IsPlayerSprite(pTSprite) && gViewInterpolate && !VanillaMode()) // improve network player prediction while in third person/co-op view
+        {
+            pTSprite->x = gViewSpritePredictLoc.x;
+            pTSprite->y = gViewSpritePredictLoc.y;
+            pTSprite->z = gViewSpritePredictLoc.z;
+            pTSprite->ang = fix16_to_int(gViewSpritePredictLoc.ang);
+        }
+        else if (gViewInterpolate && TestBitString(gInterpolateSprite, nSprite) && !(pTSprite->flags&512))
         {
             LOCATION *pPrevLoc = &gPrevSpriteLoc[nSprite];
             pTSprite->x = interpolate(pPrevLoc->x, pTSprite->x, gInterpolate);
@@ -4015,7 +4027,7 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
     int q16SlopeTilt = fix16_from_float(0.82f);
     int cX = 160;
     int cY = defaultHoriz;
-    if (!gCenterHoriz && (r_mirrormode & 1)) // offset crosshair if mirror mode is set to vertical mode
+    if (!gCenterHoriz && (MIRRORMODE & 1)) // offset crosshair if mirror mode is set to vertical mode
         cY += 19;
     cX <<= 16;
     cY <<= 16;
@@ -4026,12 +4038,12 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
         const int q16hfov = divscale16(90, gFov);
         const int q16vfov = Blrintf(float(fix16_one) * fFov);
         int cZ = pPlayer->relAim.dy * 160 / pPlayer->relAim.dx; // calculate aiming target offset from center
-        if (r_mirrormode & 1) // mirror mode flip
+        if (MIRRORMODE & 1) // mirror mode flip
             cZ = -cZ;
         cX += mulscale16(cZ<<16, q16hfov); // scale to current fov
         cZ = mulscale16((8<<4)<<16, q16vfov)>>16; // calculate vertical fov scale
         cZ = (pPlayer->relAim.dz / cZ)<<16; // convert target z to on screen units
-        if (r_mirrormode & 2) // mirror mode flip
+        if (MIRRORMODE & 2) // mirror mode flip
             cZ = -cZ;
         cY += cZ;
 
@@ -4055,7 +4067,7 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
     if (gSlopeTilting && (gSlopeReticle || bShowAutoAimTarget)) // adjust crosshair for slope tilting/auto aim
     {
         q16SlopeTilt = mulscale16(q16slopehoriz, q16SlopeTilt);
-        if (r_mirrormode & 2) // mirror mode flip
+        if (MIRRORMODE & 2) // mirror mode flip
             q16SlopeTilt = -q16SlopeTilt;
         cY += q16SlopeTilt;
     }
@@ -4410,6 +4422,7 @@ void viewDrawScreen(void)
         renderSetAspect(viewingRange_fov, yxaspect);
         int cX = gView->pSprite->x;
         int cY = gView->pSprite->y;
+        gViewSpritePredictLoc.z = gView->pSprite->z;
         int cZ = gView->zView;
         int zDelta = gView->zWeapon-gView->zView-(12<<8);
         fix16_t cA = gView->q16ang;
@@ -4436,6 +4449,7 @@ void viewDrawScreen(void)
                 v8c = interpolate(predictOld.at8, predict.at8, gInterpolate);
                 v4c = interpolate(predictOld.at1c, predict.at1c, gInterpolate);
                 v48 = interpolate(predictOld.at18, predict.at18, gInterpolate);
+                gViewSpritePredictLoc.z = interpolate(predictOld.at58, predict.at58, gInterpolate);
             }
             else
             {
@@ -4451,6 +4465,7 @@ void viewDrawScreen(void)
                 v8c = interpolate(pView->at8, v8c, gInterpolate);
                 v4c = interpolate(pView->at1c, v4c, gInterpolate);
                 v48 = interpolate(pView->at18, v48, gInterpolate);
+                gViewSpritePredictLoc.z = interpolate(pView->at58, gViewSpritePredictLoc.z, gInterpolate);
             }
         }
         if (gView == gMe && (numplayers <= 1 || gPrediction) && gView->pXSprite->health != 0 && !VanillaMode())
@@ -4460,6 +4475,7 @@ void viewDrawScreen(void)
             q16look = gViewLook;
             q16horiz = fix16_from_float(100.f * tanf(fix16_to_float(q16look) * fPI / 1024.f));
         }
+        gViewSpritePredictLoc.x = cX, gViewSpritePredictLoc.y = cY, gViewSpritePredictLoc.ang = cA;
         viewUpdateShake();
         q16horiz += fix16_from_int(shakeHoriz);
         cA += fix16_from_int(shakeAngle);
@@ -4790,7 +4806,7 @@ RORHACK:
         sub_557C4(cX, cY, gInterpolate);
         renderDrawMasks();
         gView->pSprite->cstat = bakCstat;
-        char bMirrorScreen = (videoGetRenderMode() == REND_CLASSIC) && r_mirrormode; // mirror framebuffer for classic renderer
+        char bMirrorScreen = (videoGetRenderMode() == REND_CLASSIC) && MIRRORMODE; // mirror framebuffer for classic renderer
 
         if ((videoGetRenderMode() == REND_CLASSIC) && (gRenderScale > 1) && !bRenderScaleRefresh)
         {

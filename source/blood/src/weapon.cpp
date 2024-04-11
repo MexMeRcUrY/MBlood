@@ -204,7 +204,7 @@ char checkAmmo2(PLAYER *pPlayer, int ammotype, int amount)
 
 void SpawnBulletEject(PLAYER *pPlayer, int a2, int a3)
 {
-    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert position for bullet ejection
+    if ((MIRRORMODE & 1) && !VanillaMode(true)) // mirror mode enabled, invert position for bullet ejection
         a2 = -a2, a3 = -a3;
     POSTURE *pPosture = &pPlayer->pPosture[pPlayer->lifeMode][pPlayer->posture];
     pPlayer->zView = pPlayer->pSprite->z-pPosture->eyeAboveZ;
@@ -220,7 +220,7 @@ void SpawnBulletEject(PLAYER *pPlayer, int a2, int a3)
 
 void SpawnShellEject(PLAYER *pPlayer, int a2, int a3)
 {
-    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert position for shell ejection
+    if ((MIRRORMODE & 1) && !VanillaMode(true)) // mirror mode enabled, invert position for shell ejection
         a2 = -a2, a3 = -a3;
     POSTURE *pPosture = &pPlayer->pPosture[pPlayer->lifeMode][pPlayer->posture];
     pPlayer->zView = pPlayer->pSprite->z-pPosture->eyeAboveZ;
@@ -853,7 +853,7 @@ void WeaponLower(PLAYER *pPlayer)
     pPlayer->curWeapon = kWeaponNone;
     pPlayer->qavLoop = 0;
 
-    if ((prevWeapon != 6) && (prevWeapon != 7) && !VanillaMode()) // reset weapon state after switching weapon (except when switching from tnt/spray)
+    if ((prevWeapon != kWeaponTNT && prevWeapon != kWeaponSprayCan) && !VanillaMode()) // reset weapon state after switching weapon (except when switching from tnt/spray)
         pPlayer->weaponState = 0;
 }
 
@@ -1439,7 +1439,7 @@ void AltFireSpread2(int nTrigger, PLAYER *pPlayer)
     dassert(nTrigger > 0 && nTrigger <= kMaxSpread);
     Aim *aim = &pPlayer->aim;
     int angle;
-    if ((r_mirrormode & 1) && (numplayers == 1 || r_mirrormodelock) && !VanillaMode(true)) // mirror mode enabled, invert tommy gun spread (only for single-player)
+    if ((MIRRORMODE & 1) && !VanillaMode(true)) // mirror mode enabled, invert tommy gun spread (only for single-player)
         angle = (getangle(aim->dx, aim->dy)-((112*(nTrigger-1))/14-56))&2047;
     else
         angle = (getangle(aim->dx, aim->dy)+((112*(nTrigger-1))/14-56))&2047;
@@ -1648,7 +1648,7 @@ void AltFireVoodoo(int nTrigger, PLAYER *pPlayer)
                 }
             }
 
-            if (WeaponsNotBlood()) // use all ammo on alt fire
+            if (WeaponsNotBlood() && !gInfiniteAmmo) // use all ammo on alt fire
             {
                 UseAmmo(pPlayer, 9, pPlayer->ammoCount[9]);
                 pPlayer->hasWeapon[kWeaponVoodoo] = 0;
@@ -1693,6 +1693,11 @@ void AltFireVoodoo(int nTrigger, PLAYER *pPlayer)
             }
         }
         UseAmmo(pPlayer, 9, pPlayer->ammoCount[9]);
+        if (gInfiniteAmmo && !VanillaMode())
+        {
+            pPlayer->weaponState = 0;
+            return;
+        }
         pPlayer->hasWeapon[kWeaponVoodoo] = 0;
         pPlayer->weaponState = -1;
     }
