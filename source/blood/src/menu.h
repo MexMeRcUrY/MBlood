@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 extern CGameMenu menuMain;
 extern CGameMenu menuMainWithSave;
+extern CGameMenu menuFirstLaunch;
 extern CGameMenu menuNetMain;
 extern CGameMenu menuNetStart;
 extern CGameMenu menuEpisode;
@@ -40,10 +41,6 @@ extern CGameMenu menuQuit;
 extern CGameMenu menuRestart;
 extern CGameMenu menuCredits;
 extern CGameMenu menuHelp;
-extern CGameMenu menuNetwork;
-extern CGameMenu menuNetworkHost;
-extern CGameMenu menuNetworkJoin;
-extern CGameMenu menuNetworkBrowser;
 
 extern CGameMenu menuOptions;
 extern CGameMenu menuOptionsGame;
@@ -64,8 +61,6 @@ void drawLoadingScreen(void);
 void SetupMenus(void);
 void UpdateNetworkMenus(void);
 void SetGameVanillaMode(char nState);
-void NetworkBrowserAdd(const char *pString, int nPort, const char *pHost, int nClientsCur, int nClientsMax);
-void NetworkBrowserState(const char *pString);
 void QuickSaveGame(void);
 void AutosaveGame(bool bLevelStartSave);
 void QuickLoadGame(void);

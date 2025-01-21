@@ -36,6 +36,7 @@ typedef struct {
     int32_t forcesetup;
     int32_t noautoload;
     int32_t quickstart;
+    int32_t firstlaunch;
     char lastini[BMAX_PATH];
 } ud_setup_t;
 
@@ -43,7 +44,6 @@ extern ud_setup_t gSetup;
 extern ClockTicks gFrameClock;
 extern ClockTicks gFrameTicks;
 extern int gFrame;
-//extern ClockTicks gGameClock;
 extern int gFrameRate;
 extern int gGamma;
 

@@ -265,7 +265,11 @@ void CFX::fxProcess(void)
         if (zvel[nSprite])
             pSprite->z += zvel[nSprite]>>8;
         const bool bCasingType = (pSprite->type >= FX_37) && (pSprite->type <= FX_42);
+#ifdef NOONE_EXTENSIONS
+        if (bCasingType && gGameOptions.bSectorBehavior && !gModernMap && !VanillaMode()) // check if new xy position is within a wall
+#else
         if (bCasingType && gGameOptions.bSectorBehavior && !VanillaMode()) // check if new xy position is within a wall
+#endif
         {
             if (!cansee(oldPos.x, oldPos.y, oldPos.z, pSprite->sectnum, pSprite->x, pSprite->y, oldPos.z, pSprite->sectnum)) // if new position has clipped into wall, invert velocity and continue
             {
@@ -297,7 +301,7 @@ void CFX::fxProcess(void)
                         {
                             ChangeSpriteSect(nSprite, nSectnum);
                             viewCorrectSpriteInterpolateOffsets(nSprite, pSprite, &oldPos); // if sprite is set to be interpolated, update previous position
-                            sfxUpdateSpritePos(pSprite, &oldPos); // update any assigned sfx to new sprite position
+                            sfxUpdateSpritePos(pSprite, (vec3_t const*)&oldPos); // update any assigned sfx to new sprite position
                             continue;
                         }
                         else if (bOpenAirROR) // something went terribly wrong, free sprite
@@ -407,7 +411,11 @@ void fxSpawnEjectingBrass(spritetype *pSprite, int z, int a3, int a4)
     if (pBrass)
     {
         if (!VanillaMode())
+        {
             pBrass->ang = Random(2047);
+            if (EnemiesNotBlood() && !IsPlayerSprite(pSprite)) // used to flag if shells should be removed when touching grass (like you 'ought to, nerd)
+                pBrass->cstat |= kPhysFalling;
+        }
         int nDist = (a4<<18)/120+Random2(((a4/4)<<18)/120);
         int nAngle = pSprite->ang+Random2(56)+512;
         xvel[pBrass->index] = mulscale30(nDist, Cos(nAngle));
@@ -438,7 +446,11 @@ void fxSpawnEjectingShell(spritetype *pSprite, int z, int a3, int a4)
     if (pShell)
     {
         if (!VanillaMode())
+        {
             pShell->ang = Random(2047);
+            if (EnemiesNotBlood() && !IsPlayerSprite(pSprite)) // used to flag if shells should be removed when touching grass (like you 'ought to, nerd)
+                pShell->cstat |= kPhysFalling;
+        }
         int nDist = (a4<<18)/120+Random2(((a4/4)<<18)/120);
         int nAngle = pSprite->ang+Random2(56)+512;
         xvel[pShell->index] = mulscale30(nDist, Cos(nAngle));

@@ -90,6 +90,15 @@ void SetTargetMode(bool notarget)
         viewSetMessage("Notarget off.");
 }
 
+void SetFlyMode(bool fly)
+{
+    gFlyMode = fly;
+    if (gFlyMode)
+        viewSetMessage("Flymode on.");
+    else
+        viewSetMessage("Flymode off.");
+}
+
 void packStuff(PLAYER *pPlayer)
 {
     for (int i = 0; i < kPackMax; i++)
@@ -409,7 +418,11 @@ void CGameMessageMgr::Display(void)
             int initialNrOfDisplayedMsgs = numberOfDisplayedMessages;
             int initialMessagesIndex = messagesIndex;
             int shade = ClipHigh(initialNrOfDisplayedMsgs*8, 48);
-            int x = gViewX0S-xoffset;
+#if 0 // original logic - very broken
+            int x = gViewMode == 3 ? gViewX0S : 0;
+#else
+            int x = this->x - xoffset;
+#endif
             int y = (gViewMode == 3 ? this->y : 0) + (int)at9;
             for (int i = 0; i < initialNrOfDisplayedMsgs; i++)
             {
@@ -458,7 +471,7 @@ void CGameMessageMgr::Display(void)
             SortMessagesByTime(messagesToDisplay, messagesToDisplayCount);
 
             int shade = ClipHigh(messagesToDisplayCount*8, 48);
-            int x = gViewX0S-xoffset;
+            int x = this->x - xoffset;
             int y = this->y + (int)at9;
             for (int i = 0; i < messagesToDisplayCount; i++)
             {
@@ -733,6 +746,7 @@ CCheatMgr::CHEATINFO CCheatMgr::s_CheatInfo[] = {
     {"WVMPWJD", kCheatVulovic, 0 }, // VULOVIC (Gives feather fall)
     {"PQQFOIFJNFS", kCheatOppenheimer, 0 }, // OPPENHEIMER (Increases explosion damage by 4x)
     {"UIF!POF", kCheatMatrixNeo, 0 }, // THE ONE (Grants all weapons and infinite akimbo powerup)
+    {"LSBWJU[", kCheatKravitz, 0 }, // KRAVITZ (Fly mode)
 };
 
 bool CCheatMgr::m_bPlayerCheated = false;
@@ -744,7 +758,7 @@ bool CCheatMgr::Check(char *pzString)
     Bstrupr(buffer);
     for (size_t i = 0; i < strlen(pzString); i++)
         buffer[i]++;
-    for (int i = 0; i < 44; i++)
+    for (int i = 0; i < 45; i++)
     {
         int nCheatLen = strlen(s_CheatInfo[i].pzString);
         if (s_CheatInfo[i].flags & 1)
@@ -993,6 +1007,12 @@ void CCheatMgr::Process(CCheatMgr::CHEATCODE nCheatCode, char* pzArgs)
         SetWooMode(gMatrixMode);
         viewSetMessage(gMatrixMode ? "You are the one, Caleb" : "You have taken the blue pill");
         break;
+    case kCheatKravitz:
+        if (VanillaMode()) // not supported by vanilla mode
+            return;
+        SetFlyMode(!gFlyMode);
+        viewSetMessage(gFlyMode ? "You feel like a little dragonfly" : "You have eaten the sun");
+        break;
     default:
         break;
     }
@@ -1005,6 +1025,7 @@ void CCheatMgr::ResetCheats(void)
     playerSetGodMode(gMe, 0);
     gNoClip = 0;
     gNoTarget = 0;
+    gFlyMode = 0;
     packClear(gMe);
     gInfiniteAmmo = 0;
     gFullMap = 0;

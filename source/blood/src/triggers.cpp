@@ -308,7 +308,8 @@ void LifeLeechOperate(spritetype *pSprite, XSPRITE *pXSprite, const EVENT &event
                             if (WeaponsNotBlood() && !VanillaMode()) // reduce the firing rate of the lifeleech
                                 pXSprite->stateTimer = 3;
                             evPost(pSprite->index, 3, t2, kCallbackLeechStateTimer);
-                            pXSprite->data3 = ClipLow(pXSprite->data3-1, 0);
+                            if (!(gInfiniteAmmo && !VanillaMode())) // forever let lifeleech fire
+                                pXSprite->data3 = ClipLow(pXSprite->data3-1, 0);
                             if ((ProjectilesRaze() || ProjectilesNotBlood()) && !VanillaMode()) // disable collisions so lifeleech doesn't do that weird bobbing
                                 pMissile->cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
                         }
@@ -580,7 +581,7 @@ void OperateSprite(int nSprite, XSPRITE *pXSprite, const EVENT &event)
                 evPost(nSprite, 3, 18, kCmdOff, causerID);
             }
         }
-        break;    
+        break;
     case kThingArmedProxBomb:
         if (pSprite->statnum != kStatRespawn) {
             switch (event.cmd) {

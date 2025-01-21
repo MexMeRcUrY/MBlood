@@ -26,7 +26,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define kMaxMessages 32
 #define kMaxEpisodes 7
-#define kMaxLevels 16
+#ifdef NOONE_EXTENSIONS
+  // allow advanced mods to use more than 16 levels.
+  // for example, Blood: What Lies Beneath has 43 (as of version 1.1)
+  #define kMaxLevels 64
+#else // original blood only allowed 16 levels per episode
+  #define kMaxLevels 16
+#endif
 
 #pragma pack(push, 1)
 
@@ -55,7 +61,7 @@ struct GAMEOPTIONS {
     int nItemRespawnTime;
     int nSpecialRespawnTime;
     bool bQuadDamagePowerup;
-    bool bDamageInvul;
+    int nDamageInvul;
     int nExplosionBehavior;
     int nProjectileBehavior;
     bool bNapalmFalloff;
@@ -142,25 +148,28 @@ enum {
 
     // monster behavior tweaks
     BANNED_RATS_BITE   =  1 <<  8,
+    BANNED_MSPIDERS_HP =  1 <<  9,
+    BANNED_TCHERNOBOG_HP= 1 << 10,
 
     // weapons
-    BANNED_FLARE       =  1 << 12,
-    BANNED_SHOTGUN     =  1 << 13,
-    BANNED_TOMMYGUN    =  1 << 14,
-    BANNED_NAPALM      =  1 << 15,
-    BANNED_TNT         =  1 << 16,
-    BANNED_SPRAYCAN    =  1 << 17,
-    BANNED_TESLA       =  1 << 18,
-    BANNED_LIFELEECH   =  1 << 19,
-    BANNED_VOODOO      =  1 << 20,
-    BANNED_PROXY       =  1 << 21,
-    BANNED_REMOTE      =  1 << 22,
+    BANNED_FLARE       =  1 << 11,
+    BANNED_SHOTGUN     =  1 << 12,
+    BANNED_TOMMYGUN    =  1 << 13,
+    BANNED_NAPALM      =  1 << 14,
+    BANNED_TNT         =  1 << 15,
+    BANNED_SPRAYCAN    =  1 << 16,
+    BANNED_TESLA       =  1 << 17,
+    BANNED_LIFELEECH   =  1 << 18,
+    BANNED_VOODOO      =  1 << 19,
+    BANNED_PROXY       =  1 << 20,
+    BANNED_REMOTE      =  1 << 21,
 
     // items
-    BANNED_MEDKIT      =  1 << 23,
-    BANNED_LIFEESSENCE =  1 << 24,
-    BANNED_LIFESEED    =  1 << 25,
-    BANNED_SUPERARMOR  =  1 << 26,
+    BANNED_MEDKIT      =  1 << 22,
+    BANNED_LIFEESSENCE =  1 << 23,
+    BANNED_LIFESEED    =  1 << 24,
+    BANNED_SUPERARMOR  =  1 << 25,
+    BANNED_CRYSTALBALL =  1 << 26,
 
     // powerups
     BANNED_JUMPBOOTS   =  1 << 27,

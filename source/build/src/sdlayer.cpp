@@ -973,10 +973,19 @@ void joyScanDevices()
 
                 inputdevices |= DEV_JOYSTICK;
 
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+                if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 18))
+                {
+                    if (SDL_GameControllerHasRumble(controller))
+                        joystick.hasRumble = 1;
+                    else DVLOG_F(LOG_INPUT, "Couldn't init controller rumble: %s.", SDL_GetError());
+                }
+                else
+#endif
 #if SDL_VERSION_ATLEAST(2, 0, 9)
                 if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 9))
                 {
-                    if (!SDL_GameControllerRumble(controller, 0xc000, 0xc000, 10))
+                    if (!SDL_GameControllerRumble(controller, 1, 1, 1))
                         joystick.hasRumble = 1;
                     else DVLOG_F(LOG_INPUT, "Couldn't init controller rumble: %s.", SDL_GetError());
                 }
@@ -1019,10 +1028,19 @@ void joyScanDevices()
                 SDL_JoystickEventState(SDL_ENABLE);
                 inputdevices |= DEV_JOYSTICK;
 
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+                if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 18))
+                {
+                    if (SDL_JoystickHasRumble(joydev))
+                        joystick.hasRumble = 1;
+                    else DVLOG_F(LOG_INPUT, "Couldn't init joystick rumble: %s.", SDL_GetError());
+                }
+                else
+#endif
 #if SDL_VERSION_ATLEAST(2, 0, 9)
                 if (EDUKE32_SDL_LINKED_PREREQ(linked, 2, 0, 9))
                 {
-                    if (!SDL_JoystickRumble(joydev, 0xffff, 0xffff, 200))
+                    if (!SDL_JoystickRumble(joydev, 1, 1, 1))
                         joystick.hasRumble = 1;
                     else DVLOG_F(LOG_INPUT, "Couldn't init joystick rumble: %s.", SDL_GetError());
                 }
@@ -1855,6 +1873,7 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 
               { SDL_GL_STENCIL_SIZE, 1 },
               { SDL_GL_ACCELERATED_VISUAL, 1 },
+              { SDL_GL_DEPTH_SIZE, 24 },
           };
 
         SDL_GL_ATTRIBUTES(i, sdlayer_gl_attributes);
@@ -2014,22 +2033,17 @@ void videoBeginDrawing(void)
 //
 // mirrorTile() -- mirror input tile buffer
 //
-static uint8_t mirroredLine[1920*4] = {0};
-
 void videoMirrorTile(uint8_t *pTile, int nWidth, int nHeight)
 {
-    const size_t nSize = nWidth;
-    uint8_t *pBuff = mirroredLine;
-    const char bAllocBuff = nSize > sizeof(mirroredLine); // if bigger than static mirrored line, allocate from memory (very slow!)
-
-    if (!MIRRORMODE || !pTile || !nSize)
+    if (!MIRRORMODE || !pTile || nWidth <= 0)
         return;
-    if (bAllocBuff)
-    {
-        pBuff = (uint8_t *)Xmalloc(nSize);
-        if (!pBuff)
-            return;
-    }
+
+    static uint8_t buffMirroredLine[1920*4] = {0};
+    const char bAllocBuff = (size_t)nWidth > sizeof(buffMirroredLine); // if bigger than static mirrored line, allocate from cache
+
+    uint8_t *pBuff = !bAllocBuff ? buffMirroredLine : (uint8_t*)Xmalloc(nWidth);
+    if (!pBuff)
+        return;
 
     if (MIRRORMODE & 1) // mirror mode (horiz)
     {
@@ -2051,7 +2065,7 @@ void videoMirrorTile(uint8_t *pTile, int nWidth, int nHeight)
         }
     }
     if (bAllocBuff)
-        Bfree(pBuff);
+        Xfree(pBuff);
 }
 
 //

@@ -148,8 +148,8 @@ struct PLAYER
     int                 zWeapon;
     int                 zWeaponVel;
     fix16_t             q16look;
-    int                 q16horiz;       // horiz
-    int                 q16slopehoriz;  // horizoff
+    fix16_t             q16horiz;       // horiz
+    fix16_t             q16slopehoriz;  // horizoff
     int                 slope;
     bool                isUnderwater;
     bool                hasKey[8];
@@ -220,13 +220,17 @@ struct PLAYER
     int                 handTime;
     bool                hand;  // if true, there is hand start choking the player
     int                 pickupEffect;
-    bool                flashEffect;  // if true, reduce pPlayer->visibility counter
+    bool                flashEffect;  // if true, reduce pPlayer->visibility counter; originally 32-bit
     int                 quakeEffect;
     fix16_t             q16ang;
     int                 angold;
     int                 player_par;
     int                 nWaterPal;
     POSTURE             pPosture[kModeMax][kPostureMax];
+
+    // Calculates checksum for multiplayer games. Skips data referenced
+    // by pointers, like XSPRITE structs. Other bits might further be skipped.
+    uint32_t CalcNonSpriteChecksum(void);
 };
 
 struct PROFILE
@@ -479,7 +483,7 @@ spritetype *playerFireThing(PLAYER *pPlayer, int a2, int a3, int thingType, int 
 void        playerFrag(PLAYER *pKiller, PLAYER *pVictim);
 void        FragPlayer(PLAYER *pPlayer, int nSprite);
 void        playerInitRoundCheck(void);
-void        playerProcessRoundCheck(void);
+void        playerProcessRoundCheck(PLAYER *pPlayer);
 int         playerDamageArmor(PLAYER *pPlayer, DAMAGE_TYPE nType, int nDamage);
 spritetype *playerDropFlag(PLAYER *pPlayer, int a2);
 int         playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, int nDamage);

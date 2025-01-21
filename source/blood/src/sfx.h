@@ -51,7 +51,6 @@ struct DMGFEEDBACK
 extern int gSoundSpeed;
 extern int gSoundEarAng;
 extern int gSoundOcclusion;
-extern int gSoundUnderwaterPitch;
 
 extern BONKLE Bonkle[256];
 extern BONKLE* BonkleCache[256];
@@ -72,9 +71,7 @@ void sfxPlay3DSoundCP(spritetype* pSprite, int soundId, int chanId = -1, int nFl
 void sfxKill3DSound(spritetype *pSprite, int chanId = -1, int soundId = -1);
 void sfxKillAllSounds(void);
 void sfxKillSpriteSounds(spritetype *pSprite);
-void sfxUpdateSpritePos(spritetype *pSprite, vec3_t *pOffsetPos = NULL);
-void sfxUpdateListenerPos(void);
-void sfxUpdateListenerVel(void);
+void sfxUpdateSpritePos(spritetype *pSprite, vec3_t const *pOldPos = NULL);
 void sfxCorrectListenerPos(void);
 void sfxResetListener(void);
 void sfxUpdate3DSounds(void);

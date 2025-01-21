@@ -189,6 +189,13 @@ const DEMOVALIDATE gDemoValidate[] = {
     {"/validatedemos/TEST127.DEM", (int32_t)0x00001BD3, 0xA53BC5B3, 0x00000C21, {(int32_t)0x000017E7, (int32_t)0x000036A7, (int32_t)0xFFFFF1E4}, 0},
     {"/validatedemos/TEST128.DEM", (int32_t)0x000022CE, 0x1F4DC465, 0x00000640, {(int32_t)0x000016D6, (int32_t)0x00003526, (int32_t)0xFFFFF1E4}, 0},
     {"/validatedemos/TEST129.DEM", (int32_t)0x00000B4C, 0x4A2A6308, 0x00000000, {(int32_t)0x0000393F, (int32_t)0x00005E42, (int32_t)0x000051A4}, 0},
+    {"/validatedemos/TEST130.DEM", (int32_t)0x00002B93, 0xF4B28CC5, 0x00000000, {(int32_t)0x000093EF, (int32_t)0x00001244, (int32_t)0x000119A4}, 1},
+    {"/validatedemos/TEST131.DEM", (int32_t)0x0000633B, 0x169354F2, 0x0000048F, {(int32_t)0x0000BDC6, (int32_t)0x00005363, (int32_t)0x000009E4}, 1},
+    {"/validatedemos/TEST132.DEM", (int32_t)0x000044A2, 0x9AB1E4C7, 0x00000640, {(int32_t)0xFFFFB6EA, (int32_t)0xFFFF87BA, (int32_t)0x00005D50}, 1},
+    {"/validatedemos/TEST133.DEM", (int32_t)0x00001075, 0x090AEA76, 0x00000000, {(int32_t)0xFFFF327B, (int32_t)0x00009CEB, (int32_t)0x00003EE4}, 1},
+    {"/validatedemos/TEST134.DEM", (int32_t)0x000008E1, 0xB172DEB5, 0x00000000, {(int32_t)0x00000482, (int32_t)0x000078C1, (int32_t)0xFFFF39A4}, 1},
+    {"/validatedemos/TEST135.DEM", (int32_t)0x00002B13, 0xED1F723F, 0x000002FF, {(int32_t)0x0000A241, (int32_t)0x0000A067, (int32_t)0x00020D50}, 1},
+    {"/validatedemos/TEST136.DEM", (int32_t)0x00003419, 0x5BD6E490, 0x00000B1B, {(int32_t)0x0000A245, (int32_t)0x00009F55, (int32_t)0x00020DE4}, 1},
 };
 
 int nBuild = 0;
@@ -318,7 +325,8 @@ bool CDemo::Create(const char *pzFile)
     {
         for (int i = 0; i < 8 && !vc; i++)
         {
-            G_ModDirSnprintf(buffer, BMAX_PATH, "%s0%02d.dem", BloodIniPre, i);
+            if (G_ModDirSnprintf(buffer, BMAX_PATH, "%s0%02d.dem", BloodIniPre, i))
+                return false;
             if (access(buffer, F_OK) != -1)
                 vc = 1;
         }
@@ -391,7 +399,7 @@ void CDemo::Write(GINPUT *pPlayerInputs)
     {
         memcpy(&at1aa[nInputTicks&1023], &pPlayerInputs[p], sizeof(GINPUT));
         nInputTicks++;
-        if((nInputTicks&(kInputBufferSize-1))==0)
+        if ((nInputTicks&(kInputBufferSize-1))==0)
             FlushInput(kInputBufferSize);
     }
 }
@@ -551,6 +559,8 @@ void CDemo::Playback(void)
     if (!CGameMenuMgr::m_bActive)
     {
         gGameMenuMgr.Push(&menuMain, -1);
+        if (gSetup.firstlaunch)
+            gGameMenuMgr.Push(&menuFirstLaunch, -1);
         at2 = 1;
     }
     gNetFifoClock = totalclock;
@@ -701,10 +711,6 @@ _DEMOPLAYBACK:
             {
                 if (gGameStarted) // dim background
                     viewDimScreen();
-                if (gGameMenuMgr.pActiveMenu == &menuNetworkBrowser) // search for servers
-                    netIRCProcess();
-                else // exited server browser, gracefully disconnect from master list
-                    netIRCDeinitialize();
                 gGameMenuMgr.Draw();
             }
             else if (gDemoRunValidation) // keep game locked
@@ -803,7 +809,8 @@ void CDemo::FlushInput(int nCount)
         bitWriter.writeBit(pInput->buttonFlags.lookDown);
         bitWriter.skipBits(26);
         bitWriter.writeBit(pInput->keyFlags.action);
-        bitWriter.writeBit(pInput->keyFlags.jab);
+        //bitWriter.writeBit(pInput->keyFlags.jab); // unused
+        bitWriter.skipBits(1);
         bitWriter.writeBit(pInput->keyFlags.prevItem);
         bitWriter.writeBit(pInput->keyFlags.nextItem);
         bitWriter.writeBit(pInput->keyFlags.useItem);
@@ -855,7 +862,9 @@ void CDemo::ReadInput(int nCount)
         pInput->buttonFlags.lookDown = bitReader.readBit();
         bitReader.skipBits(26);
         pInput->keyFlags.action = bitReader.readBit();
-        pInput->keyFlags.jab = bitReader.readBit();
+        //pInput->keyFlags.jab = bitReader.readBit(); // unused
+        pInput->keyFlags.isTyping = 0;
+        bitReader.skipBits(1);
         pInput->keyFlags.prevItem = bitReader.readBit();
         pInput->keyFlags.nextItem = bitReader.readBit();
         pInput->keyFlags.useItem = bitReader.readBit();

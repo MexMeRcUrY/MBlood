@@ -43,6 +43,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "view.h"
 #endif
 
+#define kMapHeaderNew 0x7474614D // 'ttaM' signature
+#define kMapHeaderOld 0x4D617474 // 'Matt' signature
+
 #ifdef NOONE_EXTENSIONS
 uint8_t gModernMap = false;
 #endif // !NOONE_EXTENSIONS
@@ -158,6 +161,44 @@ const char *gWeaponText[] = {
 };
 
 
+
+uint32_t XSPRITE::CalcChecksum(void)
+{
+    // This was originally written to calculate the checksum
+    // the way OUWB v1.21 does. Therefore, certain bits may
+    // be skipped or calculated in a different order.
+    uint32_t sum = 0;
+    sum += (reference&16383) | ((state&1)<<14) | ((busy&131071)<<15);
+    sum += (txID&1023) | ((rxID&1023)<<10) | ((command&255)<<20) |
+           ((triggerOn&1)<<28) | ((triggerOff&1)<<29) | ((wave&3)<<30);
+    sum += (busyTime&4095) | ((waitTime&4095)<<12) |
+           ((restState&1)<<24) | ((Interrutable&1)<<25) |
+           ((unused1&3)<<26) | ((respawnPending&3)<<28) |
+           ((unused2&1)<<30) | ((lT&1)<<31);
+    sum += (dropMsg&255) | ((Decoupled&1)<<8) |
+           ((triggerOnce&1)<<9) | ((isTriggered&1)<<10) |
+           ((key&7)<<11) | ((Push&1)<<14) | ((Vector&1)<<15) |
+           ((Impact&1)<<16) | ((Pickup&1)<<17) | ((Touch&1)<<18) |
+           ((Sight&1)<<19) | ((Proximity&1)<<20) |
+           ((unused3&3)<<21) | ((lSkill&31)<<23) |
+           ((lS&1)<<28) | ((lB&1)<<29) | ((lC&1)<<30) | ((DudeLockout&1)<<31);
+    sum += (data1&65535) | ((data2&65535)<<16);
+    sum += (data3&65535) | ((goalAng&2047)<<16) | ((dodgeDir&3)<<27) |
+           ((locked&1)<<29) | ((medium&3)<<30);
+    sum += (respawn&3) | ((data4&65535)<<2) |
+           ((unused4&63)<<18) | ((lockMsg&255)<<24);
+    sum += (health&4095) | ((dudeDeaf&1)<<12) | ((dudeAmbush&1)<<13) |
+           ((dudeGuard&1)<<14) | ((dudeFlag4&1)<<15) | ((target&65535)<<16);
+    sum += targetX&0xFFFFFFFF;
+    sum += targetY&0xFFFFFFFF;
+    sum += targetZ&0xFFFFFFFF;
+    sum += (burnTime&65535) | ((burnSource&65535)<<16);
+    sum += (height&65535) | ((stateTimer&65535)<<16);
+    // aiState is a state pointer. Exact pointer values depend on exe layout.
+    // For player sprites, it is apparently always set to 0.
+    sum += aiState ? (((uintptr_t)aiState)&0xFFFFFFFF) : 0;
+    return sum;
+}
 
 void dbCrypt(char *pPtr, int nLength, int nKey)
 {
@@ -732,6 +773,8 @@ char dbIsBannedSpriteType(int nType)
         bBanned = nType == kItemHealthLifeSeed;
     if (!bBanned && (nBannedType&BANNED_SUPERARMOR))
         bBanned = nType == kItemArmorSuper;
+    if (!bBanned && (nBannedType&BANNED_CRYSTALBALL))
+        bBanned = nType == kItemCrystalBall;
 
     // powerups
     if (!bBanned && (nBannedType&BANNED_JUMPBOOTS))
@@ -884,6 +927,7 @@ void dbRandomizerMode(spritetype *pSprite)
 #endif
         if ((type >= kDudeCultistTommy) && (type <= kDudeBurningBeast) && !(type >= kDudePlayer1 && type <= kDudePlayer8) && (type != kDudeCultistReserved) && (type != kDudeBeast) && (type != kDudeCultistBeast) && (type != kDudeGargoyleStone) && (type != kDudeTchernobog) && (type != kDudeCerberusTwoHead) && (type != kDudeCerberusOneHead) && (type != kDudeSpiderMother)) // filter problematic enemy types
         {
+            pSprite->flags |= kPhysGravity;
             switch (gGameOptions.nRandomizerCheat) // replace enemy according to cheat type
             {
             case  0: // "AAAAAAAA" - phantoms only
@@ -903,6 +947,7 @@ void dbRandomizerMode(spritetype *pSprite)
             }
             case  4: // "GARGOYLE" - gargoyles only
                 pSprite->type = dbRandomizerRNGDudes(20) ? kDudeGargoyleFlesh : kDudeGargoyleStone;
+                pSprite->flags &= ~kPhysGravity;
                 break;
             case  5: // "FLAMEDOG" - hell hounds only
                 pSprite->type = dbRandomizerRNGDudes(20) ? kDudeHellHound : kDudeCerberusOneHead;
@@ -968,6 +1013,9 @@ void dbRandomizerMode(spritetype *pSprite)
                 break;
             }
             }
+            if (gGameOptions.nRandomizerCheat != 12)
+                pSprite->pal = 0;
+            pSprite->cstat &= ~CSTAT_SPRITE_YFLIP;
             return;
         }
     }
@@ -988,6 +1036,7 @@ void dbRandomizerMode(spritetype *pSprite)
         {
             const int enemiesrng[] = {kDudeRat, kDudeZombieAxeLaying, kDudeHand, kDudeInnocent, kDudeCultistTNT, kDudePhantasm};
             pSprite->type = enemiesrng[dbRandomizerRNGDudes(ARRAY_SSIZE(enemiesrng))];
+            pSprite->cstat &= ~CSTAT_SPRITE_YFLIP;
             break;
         }
         case kDudeRat:
@@ -1113,6 +1162,11 @@ void dbRandomizerMode(spritetype *pSprite)
         default:
             break;
         }
+        if (pSprite->type == kDudeGargoyleFlesh || pSprite->type == kDudeGargoyleStone || pSprite->type == kDudeBat) // set the correct flags needed for flying enemies
+            pSprite->flags &= ~kPhysGravity;
+        else
+            pSprite->flags |= kPhysGravity;
+        pSprite->pal = 0;
     }
     if (gGameOptions.nRandomizerMode >= 2) // if pickups or enemies+pickups mode, randomize pickup
     {
@@ -1640,8 +1694,8 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
 
     MAPHEADER mapHeader;
     IOBuffer1.Read(&mapHeader,37/* sizeof(mapHeader)*/);
-    if (mapHeader.at16 != 0 && mapHeader.at16 != 0x7474614d && mapHeader.at16 != 0x4d617474) {
-        dbCrypt((char*)&mapHeader, sizeof(mapHeader), 0x7474614d);
+    if (mapHeader.at16 != 0 && mapHeader.at16 != kMapHeaderNew && mapHeader.at16 != kMapHeaderOld) {
+        dbCrypt((char*)&mapHeader, sizeof(mapHeader), kMapHeaderNew);
         byte_1A76C7 = 1;
     }
 
@@ -1673,7 +1727,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
     gSongId = mapHeader.at16;
     if (byte_1A76C8)
     {
-        if (mapHeader.at16 == 0x7474614d || mapHeader.at16 == 0x4d617474)
+        if (mapHeader.at16 == kMapHeaderNew || mapHeader.at16 == kMapHeaderOld)
         {
             byte_1A76C6 = 1;
         }
@@ -1858,7 +1912,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
         IOBuffer1.Read(pWall, sizeof(walltype));
         if (byte_1A76C8)
         {
-            dbCrypt((char*)pWall, sizeof(walltype), (gMapRev*sizeof(sectortype)) | 0x7474614d);
+            dbCrypt((char*)pWall, sizeof(walltype), (gMapRev*sizeof(sectortype)) | kMapHeaderNew);
         }
 #if B_BIG_ENDIAN == 1
         pWall->x = B_LITTLE32(pWall->x);
@@ -1935,7 +1989,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
         IOBuffer1.Read(pSprite, sizeof(spritetype));
         if (byte_1A76C8)
         {
-            dbCrypt((char*)pSprite, sizeof(spritetype), (gMapRev*sizeof(spritetype)) | 0x7474614d);
+            dbCrypt((char*)pSprite, sizeof(spritetype), (gMapRev*sizeof(spritetype)) | kMapHeaderNew);
         }
 #if B_BIG_ENDIAN == 1
         pSprite->x = B_LITTLE32(pSprite->x);
@@ -2087,7 +2141,7 @@ int dbLoadMap(const char *pPath, int *pX, int *pY, int *pZ, short *pAngle, short
     PropagateMarkerReferences();
     if (byte_1A76C8)
     {
-        if (gSongId == 0x7474614d || gSongId == 0x4d617474)
+        if (gSongId == kMapHeaderNew || gSongId == kMapHeaderOld)
         {
             byte_1A76C6 = 1;
         }
@@ -2255,7 +2309,7 @@ int dbSaveMap(const char *pPath, int nX, int nY, int nZ, short nAngle, short nSe
     mapheader.at12 = B_LITTLE32(gVisibility);
     if (byte_1A76C6)
     {
-        gSongId = 0x7474614d;
+        gSongId = kMapHeaderNew;
     }
     else
     {
@@ -2269,7 +2323,7 @@ int dbSaveMap(const char *pPath, int nX, int nY, int nZ, short nAngle, short nSe
     mapheader.at23 = B_LITTLE16(nSpriteNum);
     if (byte_1A76C7)
     {
-        dbCrypt((char*)&mapheader, sizeof(MAPHEADER), 'ttaM');
+        dbCrypt((char*)&mapheader, sizeof(MAPHEADER), kMapHeaderNew);
     }
     IOBuffer1.Write(&mapheader, sizeof(MAPHEADER));
     if (byte_1A76C8)
@@ -2391,12 +2445,12 @@ int dbSaveMap(const char *pPath, int nX, int nY, int nZ, short nAngle, short nSe
     {
         if (byte_1A76C8)
         {
-            dbCrypt((char*)&wall[i], sizeof(walltype), gMapRev*sizeof(sectortype) | 0x7474614d);
+            dbCrypt((char*)&wall[i], sizeof(walltype), gMapRev*sizeof(sectortype) | kMapHeaderNew);
         }
         IOBuffer1.Write(&wall[i], sizeof(walltype));
         if (byte_1A76C8)
         {
-            dbCrypt((char*)&wall[i], sizeof(walltype), gMapRev*sizeof(sectortype) | 0x7474614d);
+            dbCrypt((char*)&wall[i], sizeof(walltype), gMapRev*sizeof(sectortype) | kMapHeaderNew);
         }
         if (wall[i].extra > 0)
         {
@@ -2443,12 +2497,12 @@ int dbSaveMap(const char *pPath, int nX, int nY, int nZ, short nAngle, short nSe
         {
             if (byte_1A76C8)
             {
-                dbCrypt((char*)&sprite[i], sizeof(spritetype), gMapRev*sizeof(spritetype) | 'ttaM');
+                dbCrypt((char*)&sprite[i], sizeof(spritetype), gMapRev*sizeof(spritetype) | kMapHeaderNew);
             }
             IOBuffer1.Write(&sprite[i], sizeof(spritetype));
             if (byte_1A76C8)
             {
-                dbCrypt((char*)&sprite[i], sizeof(spritetype), gMapRev*sizeof(spritetype) | 'ttaM');
+                dbCrypt((char*)&sprite[i], sizeof(spritetype), gMapRev*sizeof(spritetype) | kMapHeaderNew);
             }
             if (sprite[i].extra > 0)
             {

@@ -1,15 +1,14 @@
 ### NotBlood
-An fork of NBlood with gameplay options, optional mutators and expanded multiplayer features
+NotBlood is a fork of NBlood with gameplay options, optional mutators and multiplayer features, while retaining NBlood mod support
 
 ### Features
 * Switch to last active weapon if TNT/spray can is active when entering water
 * Basic room over room support for positional audio
 * Autosaving support for collecting keys and start of level
 * New last weapon key binding (default Q)
-* Vanilla mode (v1.21) with optional DOS mouse handling
 * BloodGDX style difficulty options for singleplayer
 * Set item box selection to activated item
-* Ability to record 1.21 compatible demos
+* Ability to record DOS compatible demos
 * Interpolated level texture panning
 * Drag and drop folder mod support
 * Customizable palette adjustment
@@ -46,7 +45,7 @@ An fork of NBlood with gameplay options, optional mutators and expanded multipla
 
 ### Installing
 1. Extract NotBlood to a new directory
-2. Copy the following files from Blood 1.21 to NotBlood folder:
+2. Copy the following files from Blood (v1.21) to NotBlood folder:
 
    BLOOD.INI
    BLOOD.RFF
@@ -72,11 +71,6 @@ If you have the GOG version of the game, do the following:
    - mount the `.cue` as a virtual CD (for example with `WinCDEmu`)
    - copy the `movie` folder from the mounted CD into NotBlood's folder
 5. Launch NotBlood (on Linux, to play Cryptic Passage, launch with the `-ini CRYPTIC.INI` parameter)
-
-### Vanilla Mode
-This feature sets the game to match v1.21 DOS compatibility, and removes any bugs fixes that come with NBlood/NotBlood
-The vanilla mode option can be found within game settings, and is only available for single-player
-It should be noted that vanilla mode does not work with modern maps
 
 ### Mutator Options
 * Replace guns akimbo with quad damage
@@ -106,6 +100,9 @@ It should be noted that vanilla mode does not work with modern maps
    - Cerberus spinning uselessly on lava
    - Check if enemy is alive before setting target for AI
    - Fixes tesla cultists bugged prone attack sequence
+   - Fixes enemy death sound effects getting cut off by blood splatter sound effects
+   - Fixes cultist's alert sound effct not getting cut on death
+   - Fixes hands choking attack working in multiplayer
 * Enemy behavior (NotBlood)
    - All of the above fixes and including:
    - Improved beast stomp attack sector scanning
@@ -115,6 +112,7 @@ It should be noted that vanilla mode does not work with modern maps
    - Cheogh blasting/attacking can now hit prone players (only for well done and above difficulties)
    - Fix Beast state when leaving water sector
    - Restore unused fall animations for cultists
+   - Shotgun/tommy gun cultists spawn spent shells (disabled in modern maps)
 * Random cultist TNT
    - This will make cultists use a variety of random thrown sprites such as:
    - Napalm balls, proxy bundles, armed spray cans or pod projectiles
@@ -129,7 +127,7 @@ It should be noted that vanilla mode does not work with modern maps
    - Makes lifeleech throwable and increases damage while in sentry mode
    - Do double melee damage if attacking enemies from 45 degrees behind
    - Allows tesla projectiles to be reflected back with reflective shots powerup
-   - Adds a special alt fire missile attack for pitchfork's charge up while quad damage is active
+   - While quad damage is active, the pitchfork's alt fire max charge will fire a missile
    - Voodoo doll alt fire attacks all targets visible on screen (like V1.X behavior) and consumes all ammo
 * Sector behavior
    - Fixes room over room sector handling with hitscan calculations
@@ -138,20 +136,18 @@ It should be noted that vanilla mode does not work with modern maps
    - Fix water/blood droplets transitioning through underwater (e.g: the cave secret in CP01.MAP)
    - Fixes blood splatter not using closest sector
    - Improves FX sprite handling regarding room over room transitioning
-   - Check wall collision for spent bullet casings movement
+   - Check wall collision for spent bullet casings movement (disabled for modern maps)
    - Allow spent bullet casings to use water sector links
    - Support spent bullet casings and blood splatter for moving sectors
    - Lower gravity of bullet casings and gibs underwater
    - Add player's velocity to spawned bullet casings
    - Make blood splatter/flare gun glow effect slope on sloped surfaces
-   - Prevent glow effects from rendering over room over room surfaces
-   - Add room over room sector transversal for shadow rendering
    - Support wall sprites moving along with elevators
    - Fix bullet hole being placed across sky tile walls
    - Use Raze phase calculation for smoother elevator rides
 * Hitscan projectiles
    - Makes enemies that use hitscan bullets spawn physical sprite based bullets with travel time
-   - Projectile speed is adjusted if bullet is underwater (25% speed penalty)
+   - Projectile speed is adjusted if bullet is underwater (50% speed penalty)
    - This mutator does not support custom modern map enemies
 * Randomizer mode
    - Set the enemy/pickups randomizer mode
@@ -169,6 +165,7 @@ It should be noted that vanilla mode does not work with modern maps
 * VULOVIC - Activates feather fall power-up
 * OPPPENHEIMER - Increases TNT explosion damage by 4 times against enemies
 * THE ONE - Toggles infinite guns akimbo/quad damage mode, infinite ammo, and all weapons
+* KRAVITZ - Toggles fly mode
 
 ### Randomizer seed cheats
 * AAAAAAAA - Phantoms only
@@ -228,10 +225,10 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable 3D projection for fake sprite shadows
 * cl_smoketrail3d
    - Enable/disable 3D smoke trail positioning for tnt/spray can (single-player only)
-* cl_hitscantransparent
-   - Enable/disable transparent bullet sprites for hitscan projectiles option
 * cl_particlesduration
    - Enable/disable extended particle duration modification (single-player only - turned off for modern maps)
+* cl_projectileoldsprite
+   - Enable/disable old pink sprite for hitscan projectiles
 * cl_weaponfastswitch
    - Enable/disable fast weapon switching
 * cl_packitemswitch
@@ -240,8 +237,14 @@ It should be noted that vanilla mode does not work with modern maps
    - Set preferred player color palette in multiplayer (0: none, 1: blue, 2: red, 3: teal, 4: gray)
 * crosshair
    - Enable/disable crosshair (0: off, 1: on, 2: on [autoaim])
+* crosshairoffsetx
+   - Set X axis offset for crosshair (-32 to 32)
+* crosshairoffsety
+   - Set Y axis offset for crosshair (-32 to 32)
 * detail
    - Change the detail graphics setting (0-4)
+* fly
+   - Toggles fly mode
 * hud_bgnewborder
    - Enable/disable new hud bottom border background image (only for r_size 5)
 * hud_bgscale
@@ -280,10 +283,8 @@ It should be noted that vanilla mode does not work with modern maps
    - Enable/disable recenter view when dropping down onto ground
 * in_crouchmode
    - Toggles crouch button (0:hold, 1:toggle)
-* in_turnsensitivity
-   - Keyboard turning sensitivity multiplier (default: 92, range: 64-128)
-* in_turnacceleration
-   - Set keyboard turning acceleration (0: off, 1: only when running, 2: always on)
+* in_targetaimassist
+   - enable/disable slowing camera movement when aiming towards a target (joystick only)
 * notarget
    - Toggles AI player detection
 * r_drawinvisiblesprites
@@ -319,7 +320,5 @@ It should be noted that vanilla mode does not work with modern maps
    - Set the speed of sound m/s used for doppler calculation (default: 343, range: 10-1000)
 * snd_occlusion
    - Enable/disable lowering sound volume by 50% for occluded sound sources
-* snd_underwaterpitch
-   - Enable/disable lowering sound pitch by 7% while underwater
 * team
    - Set preferred team in multiplayer (0: none, 1: blue, 2: red)

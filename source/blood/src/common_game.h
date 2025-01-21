@@ -45,7 +45,7 @@ extern int g_useCwd;
 #define BLOODWIDESCREENDEF "blood_widescreen.def"
 #define NOTBLOODDEF "notblood.def"
 
-#define BYTEVERSION 123
+#define BYTEVERSION 126
 
 void _SetErrorLoc(const char *pzFile, int nLine);
 void _ThrowError(const char *pzFormat, ...);
@@ -88,7 +88,7 @@ void _consoleSysMsg(const char* pMessage, ...);
 #define TILTBUFFER 4078
 #define CRYSTALBALLBUFFER 4079
 
-#define DOWNSCALEBUFFER 30456
+#define DOWNSCALEBUFFER 30450
 
 #define kExplodeMax 8
 

@@ -302,6 +302,8 @@ void CGameMenuMgr::Process(void)
         }
         joyold = joy;
     }
+    if ((event.at0 == kMenuEventEscape) && (gSetup.firstlaunch && (pActiveMenu == &menuFirstLaunch))) // do not allow launch menu to close
+        event.at0 = 0;
     if (pActiveMenu->Event(event))
         Pop();
 
@@ -360,6 +362,7 @@ void CGameMenu::InitializeItems(CGameMenuEvent &event)
 
 void CGameMenu::Draw(void)
 {
+    char bFocused = 0; // don't draw multiple tooltips when more than two items are focused
     for (int i = 0; i < m_nItems; i++)
     {
         if (pItemList[i]->pPreDrawCallback)
@@ -369,7 +372,7 @@ void CGameMenu::Draw(void)
         if (i == m_nFocus || (i != m_nFocus && !pItemList[i]->bNoDraw))
         {
             pItemList[i]->Draw();
-            if ((i == m_nFocus) && (pItemList[i]->tooltip_pzTextUpper != NULL))
+            if (!bFocused && (i == m_nFocus) && (pItemList[i]->tooltip_pzTextUpper != NULL))
             {
                 const bool twoLines = pItemList[i]->tooltip_pzTextLower != NULL;
                 const int height = twoLines ? 170 : 175;
@@ -381,6 +384,7 @@ void CGameMenu::Draw(void)
                     gMenuTextMgr.GetFontInfo(3, pItemList[i]->tooltip_pzTextLower, &width, NULL);
                     viewDrawText(3, pItemList[i]->tooltip_pzTextLower, (320/2)+2-(width/2), height+10, 0, 8, 0, true);
                 }
+                bFocused = 1;
             }
         }
         pItemList[i]->bEnable = bEnableBak;
@@ -927,6 +931,8 @@ CGameMenuItemKeyList::CGameMenuItemKeyList()
     nTopDelta = 0;
     nFocus = 0;
     nGameFuncs = 0;
+    nConflictKeys[0] = nConflictKeys[1] = nConflictKeys[2] = -1;
+    bCheckConflict = true;
     bScan = false;
 }
 
@@ -943,6 +949,8 @@ CGameMenuItemKeyList::CGameMenuItemKeyList(const char *a1, int a2, int a3, int a
     nRows = a6;
     pCallback = a8;
     nGameFuncs = a7;
+    nConflictKeys[0] = nConflictKeys[1] = nConflictKeys[2] = -1;
+    bCheckConflict = true;
 }
 
 void CGameMenuItemKeyList::Scan(void)
@@ -952,6 +960,36 @@ void CGameMenuItemKeyList::Scan(void)
     KB_ClearKeysDown();
     KB_LastScan = 0;
     bScan = true;
+}
+
+void CGameMenuItemKeyList::CheckKeyConflict(void)
+{
+    nConflictKeys[0] = nConflictKeys[1] = nConflictKeys[2] = -1;
+    bCheckConflict = false;
+    for (int j = 0; j < NUMGAMEFUNCTIONS; j++) // check every key
+    {
+        for (int i = 0; i < NUMGAMEFUNCTIONS; i++) // check if new key bind conflicts with existing key bind
+        {
+            if (i == j)
+                continue;
+            const char bKey1 = KeyboardKeys[i][0] > 0 && KeyboardKeys[i][0] < 255;
+            const char bKey2 = KeyboardKeys[i][1] > 0 && KeyboardKeys[i][1] < 255;
+            if ((bKey1 && KeyboardKeys[j][0] == KeyboardKeys[i][0]) || (bKey2 && KeyboardKeys[j][0] == KeyboardKeys[i][1]))
+            {
+                nConflictKeys[0] = KeyboardKeys[j][0];
+                nConflictKeys[1] = i;
+                nConflictKeys[2] = j;
+                return;
+            }
+            if ((bKey2 && KeyboardKeys[j][1] == KeyboardKeys[i][1]) || (bKey1 && KeyboardKeys[j][1] == KeyboardKeys[i][0]))
+            {
+                nConflictKeys[0] = KeyboardKeys[j][1];
+                nConflictKeys[1] = i;
+                nConflictKeys[2] = j;
+                return;
+            }
+        }
+    }
 }
 
 extern uint8_t KeyboardKeys[NUMGAMEFUNCTIONS][2];
@@ -1028,6 +1066,23 @@ void CGameMenuItemKeyList::Draw(void)
             }
         }
     }
+    if (bCheckConflict)
+        CheckKeyConflict();
+    if (nConflictKeys[0] >= 0)
+    {
+        char buffer3[80];
+        sprintf(buffer, "%s", nFocus == nConflictKeys[2] ? CONFIG_FunctionNumToName(nConflictKeys[1]) : CONFIG_FunctionNumToName(nConflictKeys[2]));
+        for (int j = 0; j < 40; j++)
+        {
+            if (buffer[j] == '\0')
+                break;
+            if (buffer[j] == '_')
+                buffer[j] = ' ';
+        }
+        Bsnprintf(buffer3, sizeof(buffer3), "%s already set to %s", nConflictKeys[0] == sc_Tilde ? "Tilde" : KB_ScanCodeToString(nConflictKeys[0]), buffer);
+        gMenuTextMgr.GetFontInfo(m_nFont, buffer3, &width, 0);
+        viewDrawText(3, buffer3, (320/2)+2-(width/2), 185, 0, 8, 0, true);
+    }
     nTopDelta += nNewFocus-nFocus;
     nFocus = nNewFocus;
     if (bClick)
@@ -1043,6 +1098,7 @@ void CGameMenuItemKeyList::Draw(void)
 
 bool CGameMenuItemKeyList::Event(CGameMenuEvent &event)
 {
+    const char nBannedKeys[] = {sc_Escape, sc_F1, sc_F2, sc_F3, sc_F4, sc_F5, sc_F6, sc_F8, sc_F9, sc_F10, sc_F12}; // these keys have existing hardcoded operations, do not allow any input to use these
     if (bScan)
     {
         if (KB_LastScan && KB_LastScan != sc_Pause)
@@ -1058,12 +1114,25 @@ bool CGameMenuItemKeyList::Event(CGameMenuEvent &event)
             key1 = KB_LastScan;
             if (key1 == key2)
                 key2 = 0;
+            for (int i = 0; i < (int)ARRAY_SIZE(nBannedKeys); i++)
+            {
+                if (key1 != nBannedKeys[i] && key2 != nBannedKeys[i])
+                    continue;
+                KB_FlushKeyboardQueue();
+                KB_FlushKeyboardQueueScans();
+                KB_ClearKeysDown();
+                keyFlushScans();
+                keyFlushChars();
+                bScan = 0;
+                return false;
+            }
             uint8_t oldKey[2];
             oldKey[0] = KeyboardKeys[nFocus][0];
             oldKey[1] = KeyboardKeys[nFocus][1];
             KeyboardKeys[nFocus][0] = key1;
             KeyboardKeys[nFocus][1] = key2;
             CONFIG_MapKey(nFocus, key1, oldKey[0], key2, oldKey[1]);
+            CheckKeyConflict();
             KB_FlushKeyboardQueue();
             KB_FlushKeyboardQueueScans();
             KB_ClearKeysDown();
@@ -1108,6 +1177,7 @@ bool CGameMenuItemKeyList::Event(CGameMenuEvent &event)
         KeyboardKeys[nFocus][0] = 0;
         KeyboardKeys[nFocus][1] = 0;
         CONFIG_MapKey(nFocus, 0, oldKey[0], 0, oldKey[1]);
+        CheckKeyConflict();
         return false;
     case kMenuEventScrollUp:
         if (nFocus-nTopDelta > 0)
@@ -1131,6 +1201,9 @@ bool CGameMenuItemKeyList::Event(CGameMenuEvent &event)
             }
         }
         return false;
+    case kMenuEventEscape:
+        bCheckConflict = true; // check next time user opens key list
+        break;
     }
     return CGameMenuItem::Event(event);
 }

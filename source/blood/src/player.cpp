@@ -66,10 +66,12 @@ bool gBlueFlagDropped = false;
 bool gRedFlagDropped = false;
 
 int gPlayerScores[kMaxPlayers];
+int gPlayerCoopLives[kMaxPlayers];
 ClockTicks gPlayerScoreTicks[kMaxPlayers];
 
 int gPlayerRoundLimit = 0;
 char gPlayerRoundEnding = 0;
+char gPlayerRoundLimitAnnounce = -1;
 
 int gPlayerLastKiller;
 int gPlayerLastVictim;
@@ -269,6 +271,142 @@ DAMAGEINFO damageInfo[kDamageMax] = {
     { 0, 0, 0, 0, 0, 0, 0 }
 };
 
+uint32_t PLAYER::CalcNonSpriteChecksum(void)
+{
+    // This was originally written to calculate the checksum
+    // the way OUWB v1.21 does. Therefore, certain bits may
+    // be skipped or calculated in a different order.
+    int i;
+    uint32_t sum = 0;
+    sum += used1&0xFFFFFFFF;
+    sum += weaponQav&0xFFFFFFFF;
+    sum += qavCallback&0xFFFFFFFF;
+    sum += (!!isRunning) | ((posture&0xFFFFFF)<<8);
+    sum += ((posture>>24)&255) | ((sceneQav&0xFFFFFF)<<8);
+    sum += ((sceneQav>>24)&255) | ((bobPhase&0xFFFFFF)<<8);
+    sum += ((bobPhase>>24)&255) | ((bobAmp&0xFFFFFF)<<8);
+    sum += ((bobAmp>>24)&255) | ((bobHeight&0xFFFFFF)<<8);
+    sum += ((bobHeight>>24)&255) | ((bobWidth&0xFFFFFF)<<8);
+    sum += ((bobWidth>>24)&255) | ((swayPhase&0xFFFFFF)<<8);
+    sum += ((swayPhase>>24)&255) | ((swayAmp&0xFFFFFF)<<8);
+    sum += ((swayAmp>>24)&255) | ((swayHeight&0xFFFFFF)<<8);
+    sum += ((swayHeight>>24)&255) | ((swayWidth&0xFFFFFF)<<8);
+    sum += ((swayWidth>>24)&255) | ((nPlayer&0xFFFFFF)<<8);
+    sum += ((nPlayer>>24)&255) | ((nSprite&0xFFFFFF)<<8);
+    sum += ((nSprite>>24)&255) | ((lifeMode&0xFFFFFF)<<8);
+    sum += ((lifeMode>>24)&255) | ((bloodlust&0xFFFFFF)<<8);
+    sum += ((bloodlust>>24)&255) | ((zView&0xFFFFFF)<<8);
+    sum += ((zView>>24)&255) | ((zViewVel&0xFFFFFF)<<8);
+    sum += ((zViewVel>>24)&255) | ((zWeapon&0xFFFFFF)<<8);
+    sum += ((zWeapon>>24)&255) | ((zWeaponVel&0xFFFFFF)<<8);
+
+    int32_t look = fix16_to_int(q16look), horiz = fix16_to_int(q16horiz),
+            slopehoriz = fix16_to_int(q16slopehoriz);
+
+    sum += ((zWeaponVel>>24)&255) | ((look&0xFFFFFF)<<8);
+    sum += ((look>>24)&255) | ((horiz&0xFFFFFF)<<8);
+    sum += ((horiz>>24)&255) | ((slopehoriz&0xFFFFFF)<<8);
+    sum += ((slopehoriz>>24)&255) | ((slope&0xFFFFFF)<<8);
+    sum += ((slope>>24)&255) | ((!!isUnderwater)<<8) |
+           ((!!hasKey[0])<<16) | ((!!hasKey[1])<<24);
+    sum += (!!hasKey[2]) | ((!!hasKey[3])<<8) |
+           ((!!hasKey[4])<<16) | ((!!hasKey[5])<<24);
+    sum += (!!hasKey[6]) | ((!!hasKey[7])<<8) |
+           ((hasFlag&255)<<16) | ((used2[0]&255)<<24);
+    sum += ((used2[0]>>8)&255) | ((used2[1]&65535)<<16) | ((used2[2]&255)<<24);
+    sum += ((used2[2]>>8)&255) | ((used2[3]&65535)<<16) | ((used2[4]&255)<<24);
+    sum += ((used2[4]>>8)&255) | ((used2[5]&65535)<<16) | ((used2[6]&255)<<24);
+    sum += ((used2[6]>>8)&255) | ((used2[7]&65535)<<16) |
+            ((damageControl[0]&255)<<24);
+    for (i = 0; i < kDamageMax-1; ++i)
+        sum += ((damageControl[i]>>8)&0xFFFFFF) | ((damageControl[i+1]&255)<<24);
+    sum += ((damageControl[kDamageMax-1]>>8)&0xFFFFFF) | ((curWeapon&255)<<24);
+    sum += (nextWeapon&255) | ((weaponTimer&0xFFFFFF)<<8);
+    sum += ((weaponTimer>>24)&255) | ((weaponState&0xFFFFFF)<<8);
+    sum += ((weaponState>>24)&255) | ((weaponAmmo&0xFFFFFF)<<8);
+    sum += ((weaponAmmo>>24)&255) | (!!hasWeapon[0]<<8) |
+           (!!hasWeapon[1]<<16) | (!!hasWeapon[2]<<24);
+    sum += (!!hasWeapon[3]) | (!!hasWeapon[4]<<8) |
+           (!!hasWeapon[5]<<16) | (!!hasWeapon[6]<<24);
+    sum += (!!hasWeapon[7]) | (!!hasWeapon[8]<<8) |
+           (!!hasWeapon[9]<<16) | (!!hasWeapon[10]<<24);
+    sum += (!!hasWeapon[11]) | (!!hasWeapon[12]<<8) |
+           (!!hasWeapon[13]<<16) | ((weaponMode[0]&255)<<24);
+    for (i = 0; i < 13; ++i)
+        sum += ((weaponMode[i]>>8)&0xFFFFFF) | ((weaponMode[i+1]&255)<<24);
+    sum += ((weaponMode[13]>>8)&0xFFFFFF) | ((weaponOrder[0][0]&255)<<24);
+    for (i = 0; i < 13; ++i)
+        sum += ((weaponOrder[0][i]>>8)&0xFFFFFF) | ((weaponOrder[0][i+1]&255)<<24);
+    sum += ((weaponOrder[0][13]>>8)&0xFFFFFF) | ((weaponOrder[1][0]&255)<<24);
+    for (i = 0; i < 13; ++i)
+        sum += ((weaponOrder[1][i]>>8)&0xFFFFFF) | ((weaponOrder[1][i+1]&255)<<24);
+    sum += ((weaponOrder[1][13]>>8)&0xFFFFFF) | ((ammoCount[0]&255)<<24);
+    for (i = 0; i < 11; ++i)
+        sum += ((ammoCount[i]>>8)&0xFFFFFF) | ((ammoCount[i+1]&255)<<24);
+    sum += ((ammoCount[11]>>8)&0xFFFFFF) | ((!!qavLoop)<<24);
+    sum += fuseTime&0xFFFFFFFF;
+    sum += throwTime&0xFFFFFFFF;
+    sum += throwPower&0xFFFFFFFF;
+    sum += aim.dx&0xFFFFFFFF;
+    sum += aim.dy&0xFFFFFFFF;
+    sum += aim.dz&0xFFFFFFFF;
+    sum += relAim.dx&0xFFFFFFFF;
+    sum += relAim.dy&0xFFFFFFFF;
+    sum += relAim.dz&0xFFFFFFFF;
+    sum += aimTarget&0xFFFFFFFF;
+    sum += aimTargetsCount&0xFFFFFFFF;
+    for (i = 0; i < 16; i += 2)
+        sum += (aimTargets[i]&65535) | ((aimTargets[i+1]&65535) << 16);
+    sum += deathTime&0xFFFFFFFF;
+    for (i = 0; i < 49; ++i)
+        sum += pwUpTime[i]&0xFFFFFFFF;
+    sum += fragCount&0xFFFFFFFF;
+    for (i = 0; i < 8; ++i)
+        sum += fragInfo[i]&0xFFFFFFFF;
+    sum += teamId&0xFFFFFFFF;
+    sum += fraggerId&0xFFFFFFFF;
+    sum += underwaterTime&0xFFFFFFFF;
+    sum += bloodTime&0xFFFFFFFF;
+    sum += gooTime&0xFFFFFFFF;
+    sum += wetTime&0xFFFFFFFF;
+    sum += bubbleTime&0xFFFFFFFF;
+    sum += at306&0xFFFFFFFF;
+    sum += restTime&0xFFFFFFFF;
+    sum += kickPower&0xFFFFFFFF;
+    sum += laughCount&0xFFFFFFFF;
+    sum += spin&0xFFFFFFFF;
+    sum += (!!godMode) | ((!!fallScream)<<8) |
+           ((!!cantJump)<<16) | ((packItemTime&255)<<24);
+    sum += ((packItemTime>>8)&0xFFFFFF) | ((packItemId&255)<<24);
+    sum += ((packItemId>>8)&0xFFFFFF) | ((!!packSlots[0].isActive)<<24);
+    sum += packSlots[0].curAmount&0xFFFFFFFF;
+    sum += (!!packSlots[1].isActive) | ((packSlots[1].curAmount&0xFFFFFF)<<8);
+    sum += ((packSlots[1].curAmount>>24)&255) |
+           ((!!packSlots[2].isActive)<<8) | ((packSlots[2].curAmount&65535)<<16);
+    sum += ((packSlots[2].curAmount>>16)&65535) |
+           ((!!packSlots[3].isActive)<<16) | ((packSlots[3].curAmount&255)<<8);
+    sum += ((packSlots[3].curAmount>>8)&0xFFFFFF) |
+           ((!!packSlots[4].isActive)<<24);
+    sum += packSlots[4].curAmount&0xFFFFFFFF;
+    for (i = 0; i < 3; ++i)
+        sum += armor[i]&0xFFFFFFFF;
+    sum += voodooTarget&0xFFFFFFFF;
+    sum += voodooTargets&0xFFFFFFFF;
+    sum += voodooVar1&0xFFFFFFFF;
+    sum += vodooVar2&0xFFFFFFFF;
+    sum += flickerEffect&0xFFFFFFFF;
+    sum += tiltEffect&0xFFFFFFFF;
+    sum += visibility&0xFFFFFFFF;
+    sum += painEffect&0xFFFFFFFF;
+    sum += blindEffect&0xFFFFFFFF;
+    sum += chokeEffect&0xFFFFFFFF;
+    sum += handTime&0xFFFFFFFF;
+    sum += (!!hand) | ((pickupEffect&0xFFFFFF)<<8);
+    sum += ((pickupEffect>>24)&255) | ((flashEffect&0xFFFFFF)<<8);
+    sum += ((flashEffect>>24)&255) | ((quakeEffect&0xFFFFFF)<<8);
+    return sum;
+}
+
 int powerupCheck(PLAYER *pPlayer, int nPowerUp)
 {
     dassert(pPlayer != NULL);
@@ -281,6 +419,21 @@ int powerupCheck(PLAYER *pPlayer, int nPowerUp)
     return pPlayer->pwUpTime[nPowerUp];
 }
 
+char powerupAkimboWeapons(int nWeapon)
+{
+    switch (nWeapon)
+    {
+    case kWeaponFlare:
+    case kWeaponShotgun:
+    case kWeaponTommy:
+    case kWeaponNapalm:
+    case kWeaponTesla:
+        return 1;
+    default:
+        break;
+    }
+    return 0;
+}
 
 char powerupActivate(PLAYER *pPlayer, int nPowerUp)
 {
@@ -359,7 +512,7 @@ char powerupActivate(PLAYER *pPlayer, int nPowerUp)
                     }
                     return 1;
                 }
-                if ((pPlayer->curWeapon == kWeaponPitchfork) || (pPlayer->curWeapon == kWeaponTNT) || (pPlayer->curWeapon == kWeaponSprayCan) || (pPlayer->curWeapon >= kWeaponLifeLeech)) // if weapon doesn't have a akimbo state, don't raise weapon
+                if (!powerupAkimboWeapons(pPlayer->curWeapon)) // if weapon doesn't have a akimbo state, don't raise weapon
                     break;
             }
             pPlayer->input.newWeapon = pPlayer->curWeapon;
@@ -417,7 +570,7 @@ void powerupDeactivate(PLAYER *pPlayer, int nPowerUp)
             {
                 if (gGameOptions.bQuadDamagePowerup) // if quad damage is active, do not switch weapon
                     break;
-                if ((pPlayer->curWeapon == kWeaponPitchfork) || (pPlayer->curWeapon == kWeaponTNT) || (pPlayer->curWeapon == kWeaponSprayCan) || (pPlayer->curWeapon >= kWeaponLifeLeech)) // if weapon doesn't have a akimbo state, don't raise weapon
+                if (!powerupAkimboWeapons(pPlayer->curWeapon)) // if weapon doesn't have a akimbo state, don't raise weapon
                     break;
             }
             pPlayer->input.newWeapon = pPlayer->curWeapon;
@@ -1336,7 +1489,7 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
                         sndStartSample(8001, 255, 2, 0);
                         viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, kFlagRedPal);
                         if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
-                            playerProcessRoundCheck();
+                            playerProcessRoundCheck(pPlayer);
 #if 0
                         if (dword_28E3D4 == 3 && myconnectindex == connecthead)
                         {
@@ -1382,7 +1535,7 @@ char PickupItem(PLAYER *pPlayer, spritetype *pItem) {
                         sndStartSample(8000, 255, 2, 0);
                         viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, kFlagBluePal);
                         if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
-                            playerProcessRoundCheck();
+                            playerProcessRoundCheck(pPlayer);
 #if 0
                         if (dword_28E3D4 == 3 && myconnectindex == connecthead)
                         {
@@ -1729,6 +1882,19 @@ int ActionScan(PLAYER *pPlayer, int *a2, int *a3)
     return -1;
 }
 
+inline void playerDropHand(PLAYER *pPlayer)
+{
+    spritetype *pSprite2 = actSpawnDude(pPlayer->pSprite, kDudeHand, pPlayer->pSprite->clipdist<<1, 0);
+    pSprite2->ang = (pPlayer->pSprite->ang+1024)&2047;
+    int nSprite = pPlayer->pSprite->index;
+    int x = Cos(pPlayer->pSprite->ang)>>16;
+    int y = Sin(pPlayer->pSprite->ang)>>16;
+    xvel[pSprite2->index] = xvel[nSprite] + mulscale14(0x155555, x);
+    yvel[pSprite2->index] = yvel[nSprite] + mulscale14(0x155555, y);
+    zvel[pSprite2->index] = zvel[nSprite];
+    pPlayer->hand = 0;
+}
+
 void ProcessInput(PLAYER *pPlayer)
 {
     spritetype *pSprite = pPlayer->pSprite;
@@ -1771,12 +1937,15 @@ void ProcessInput(PLAYER *pPlayer)
             pInput->newWeapon = pPlayer->curWeapon;
         if (pInput->keyFlags.action || pInput->keyFlags.useItem)
         {
+            char bAllowRespawn = 1;
+            if ((gGameOptions.nGameType == kGameTypeCoop) && (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags))
+                bAllowRespawn = gPlayerCoopLives[pPlayer->nPlayer] < gPlayerRoundLimit;
             if (bSeqStat)
             {
                 if (pPlayer->deathTime > 360)
                     seqSpawn(pPlayer->pDudeInfo->seqStartID+14, 3, pPlayer->pSprite->extra, nPlayerSurviveClient);
             }
-            else if (!gDemo.bPlaying && (seqGetStatus(3, pPlayer->pSprite->extra) < 0))
+            else if (!gDemo.bPlaying && (seqGetStatus(3, pPlayer->pSprite->extra) < 0) && bAllowRespawn)
             {
                 if (pPlayer->pSprite)
                 {
@@ -1797,18 +1966,35 @@ void ProcessInput(PLAYER *pPlayer)
                     if (gDemo.bRecording)
                         gDemo.Close();
                     pInput->keyFlags.restart = 1;
-                    if (gRestoreLastSave || gGameOptions.bPermaDeath)
-                        return; // return so ProcessFrame() can restart single-player
+                    if (gRestoreLastSave && pInput->keyFlags.action)
+                        return; // return so ProcessFrame() can load last save if action was pressed
                 }
                 else
                     playerStart(pPlayer->nPlayer);
+            }
+            else if (!gDemo.bPlaying && (seqGetStatus(3, pPlayer->pSprite->extra) < 0) && !bAllowRespawn) // all players are dead, restart level
+            {
+                char bAllPlayersDead = 1;
+                for (int i = connecthead; i >= 0 && bAllPlayersDead; i = connectpoint2[i])
+                {
+                    if (gPlayerCoopLives[i] < gPlayerRoundLimit)
+                        bAllPlayersDead = 0;
+                }
+                if (bAllPlayersDead) // trigger level restart
+                {
+                    levelRestart();
+                    gPacketStartGame.episodeId = gGameOptions.nEpisode; // copy level info to packet struct so StartLevel() won't put us back to the start of episode
+                    gPacketStartGame.levelId = gGameOptions.nLevel;
+                }
+                else if (pPlayer == gMe) // switch to next player if attempting to respawn while there are still players alive
+                    BUTTONSET(gamefunc_See_Coop_View, 1);
             }
             pInput->keyFlags.useItem = 0;
             pInput->keyFlags.action = 0;
         }
         return;
     }
-    if (pPlayer->posture == kPostureSwim)
+    if (pPlayer->posture == kPostureSwim || gFlyMode)
     {
         int x = Cos(pSprite->ang);
         int y = Sin(pSprite->ang);
@@ -1906,6 +2092,8 @@ void ProcessInput(PLAYER *pPlayer)
             pPlayer->posture = kPostureStand;
         break;
     default:
+        if (gFlyMode)
+            break;
         if (!pPlayer->cantJump && pInput->buttonFlags.jump && pXSprite->height == 0) {
             #ifdef NOONE_EXTENSIONS
             if ((packItemActive(pPlayer, kPackJumpBoots) && pPosture->pwupJumpZ != 0) || pPosture->normalJumpZ != 0)
@@ -1984,18 +2172,8 @@ void ProcessInput(PLAYER *pPlayer)
         }
         if (pPlayer->handTime > 0)
             pPlayer->handTime = ClipLow(pPlayer->handTime-kTicsPerFrame*(6-gGameOptions.nDifficulty), 0);
-        if (pPlayer->handTime <= 0 && pPlayer->hand)
-        {
-            spritetype *pSprite2 = actSpawnDude(pPlayer->pSprite, kDudeHand, pPlayer->pSprite->clipdist<<1, 0);
-            pSprite2->ang = (pPlayer->pSprite->ang+1024)&2047;
-            int nSprite = pPlayer->pSprite->index;
-            int x = Cos(pPlayer->pSprite->ang)>>16;
-            int y = Sin(pPlayer->pSprite->ang)>>16;
-            xvel[pSprite2->index] = xvel[nSprite] + mulscale14(0x155555, x);
-            yvel[pSprite2->index] = yvel[nSprite] + mulscale14(0x155555, y);
-            zvel[pSprite2->index] = zvel[nSprite];
-            pPlayer->hand = 0;
-        }
+        if (pPlayer->handTime <= 0 && pPlayer->hand) // if hand enemy successfully thrown off
+            playerDropHand(pPlayer);
         pInput->keyFlags.action = 0;
     }
     if (VanillaMode(true))
@@ -2220,10 +2398,14 @@ void playerProcess(PLAYER *pPlayer)
     pPlayer->painEffect = ClipLow(pPlayer->painEffect-kTicsPerFrame, 0);
     pPlayer->blindEffect = ClipLow(pPlayer->blindEffect-kTicsPerFrame, 0);
     pPlayer->pickupEffect = ClipLow(pPlayer->pickupEffect-kTicsPerFrame, 0);
-    if (pPlayer == gMe && gMe->pXSprite->health == 0)
-        pPlayer->hand = 0;
     if (!pXSprite->health)
+    {
+        if (pPlayer->hand && EnemiesNBlood() && gGameOptions.nGameType != kGameTypeSinglePlayer && !VanillaMode())
+            playerDropHand(pPlayer);
+        else if (!VanillaMode() || pPlayer == gMe)
+            pPlayer->hand = 0;
         return;
+    }
     pPlayer->isUnderwater = 0;
     if (pPlayer->posture == kPostureSwim)
     {
@@ -2260,7 +2442,7 @@ void playerProcess(PLAYER *pPlayer)
         break;
     }
     if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // check every tick
-        playerProcessRoundCheck();
+        playerProcessRoundCheck(NULL);
 }
 
 spritetype *playerFireMissile(PLAYER *pPlayer, int a2, int a3, int a4, int a5, int a6)
@@ -2432,21 +2614,23 @@ void FragPlayer(PLAYER *pPlayer, int nSprite)
         }
     }
     if (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags)
-        playerProcessRoundCheck();
+        playerProcessRoundCheck(pSprite && IsPlayerSprite(pSprite) ? &gPlayer[pSprite->type - kDudePlayer1] : pPlayer);
 }
 
 void playerInitRoundCheck(void)
 {
     gPlayerRoundLimit = gPlayerRoundEnding = 0;
+    gPlayerRoundLimitAnnounce = -1;
     if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMask)
     {
         gPlayerRoundLimit = (gGameOptions.uNetGameFlags&kNetGameFlagLimitMask)>>kNetGameFlagLimitBase;
         if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes) // convert to minutes
             gPlayerRoundLimit *= kTicsPerSec*60;
     }
+    memset(gPlayerCoopLives, 0, sizeof(gPlayerCoopLives));
 }
 
-void playerProcessRoundCheck(void)
+void playerProcessRoundCheck(PLAYER *pPlayer)
 {
     if (gGameOptions.nGameType <= kGameTypeCoop) // frag limits do not apply here, return
         return;
@@ -2456,7 +2640,41 @@ void playerProcessRoundCheck(void)
     if (gGameOptions.uNetGameFlags&kNetGameFlagLimitMinutes)
     {
         if (gLevelTime <= gPlayerRoundLimit) // if time limit has not been reached
+        {
+            const char *pzTimeMessage[7] = {"20 minutes left", "10 minutes left", "5 minutes left", "2 minutes left", "1 minute left", "30 seconds left", "10 seconds left"};
+            char nMessage;
+            switch (gPlayerRoundLimit-gLevelTime-1)
+            {
+            case kTicsPerSec*60*20:
+                nMessage = 0;
+                break;
+            case kTicsPerSec*60*10:
+                nMessage = 1;
+                break;
+            case kTicsPerSec*60*5:
+                nMessage = 2;
+                break;
+            case kTicsPerSec*60*2:
+                nMessage = 3;
+                break;
+            case kTicsPerSec*60:
+                nMessage = 4;
+                break;
+            case kTicsPerSec*30:
+                nMessage = 5;
+                break;
+            case kTicsPerSec*10:
+                nMessage = 6;
+                break;
+            default:
+                return;
+            }
+            if (nMessage == gPlayerRoundLimitAnnounce) // avoid triggering this multiple times per tick
+                return;
+            viewSetMessage(pzTimeMessage[nMessage], 8, MESSAGE_PRIORITY_NORMAL);
+            gPlayerRoundLimitAnnounce = nMessage;
             return;
+        }
     }
 
     int nWinner = 0, nWinners = 0;
@@ -2493,11 +2711,42 @@ void playerProcessRoundCheck(void)
         }
     }
 
-    if ((gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags) && (nScoreMax < gPlayerRoundLimit))
-        return;
-
     char buffer[80] = "Ending round...";
     int nPal = 0;
+    if ((gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags) && (nScoreMax < gPlayerRoundLimit)) // if frag/score limit has not been reached
+    {
+        if (!pPlayer)
+            return;
+        const int nPlayerScore = gGameOptions.nGameType == kGameTypeBloodBath ? pPlayer->fragCount : gPlayerScores[pPlayer->teamId];
+        const int nScoreRemaining = gPlayerRoundLimit-nPlayerScore;
+        if (nPlayerScore < 0)
+            return;
+        if (nScoreRemaining == 1 && pPlayer != gMe) // announce player's last point to all players
+        {
+            if (gGameOptions.nGameType == kGameTypeBloodBath)
+                sprintf(buffer, "\r%s\r is on their last frag!", gProfile[pPlayer->nPlayer].name);
+            else
+                sprintf(buffer, "\r%s\r is on their last score!", pPlayer->teamId ? "Red Team" : "Blue Team");
+            nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(pPlayer->teamId) : 0;
+            viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal);
+        }
+        else if (pPlayer == gMe) // only report current player's progress
+        {
+            switch (nScoreRemaining)
+            {
+            case 50:
+            case 25:
+            case 10:
+            case 5:
+            case 1:
+                sprintf(buffer, "%d %s%s left", nScoreRemaining, gGameOptions.nGameType == kGameTypeBloodBath ? "frag" : "point", nScoreRemaining > 1 ? "s" : "");
+                viewSetMessage(buffer, 8, MESSAGE_PRIORITY_NORMAL);
+                break;
+            }
+        }
+        return;
+    }
+
     if (nWinners > 1) // if there is more than one winner, count as tie
     {
         if (gGameOptions.nGameType == kGameTypeTeams)
@@ -2517,8 +2766,10 @@ void playerProcessRoundCheck(void)
     }
     viewDrawWinner(buffer, nPal);
     viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal);
-    evPost(kLevelExitNormal, 3, kTicRate * 5, kCallbackEndRound); // trigger level end in 5 seconds
+    evPost(kLevelExitNormal, 3, kTicRate * 15, kCallbackEndRound); // trigger level end in 15 seconds
     gPlayerRoundEnding = 1;
+    gPacketStartGame.uNetGameFlags |= kNetGameFlagNoLevelExit; // prevent normal level exits from triggering
+    viewSetMessage("Exiting map in 15 seconds.", 8, MESSAGE_PRIORITY_NORMAL);
 }
 
 int playerDamageArmor(PLAYER *pPlayer, DAMAGE_TYPE nType, int nDamage)
@@ -2593,15 +2844,15 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
     dassert(pPlayer != NULL);
     if (pPlayer->damageControl[nDamageType])
         return 0;
-    if (gGameOptions.bDamageInvul && !VanillaMode()) // if invul timer option is active
+    if (gGameOptions.nDamageInvul && !VanillaMode()) // if invul timer option is active
     {
         if ((nDamageType == kDamageBullet) || (nDamageType == kDamageSpirit) || (nDamageType == kDamageTesla)) // only apply invulnerability for bullet/spirit/tesla damage
         {
             const DUDEINFO *pDudeInfo = getDudeInfo(pPlayer->pSprite->type);
             const XSPRITE *pXSprite = pPlayer->pXSprite;
             const int nHealth = clamp(pXSprite->health / ((pDudeInfo->startHealth<<4)>>3), 0, kInvulSteps-1); // divide health into invul array range (0-7)
-            const int nSkill = !(gGameOptions.uNetGameFlags&kNetGameFlagSkillIssue) ? gProfile[pPlayer->nPlayer].skill : gGameOptions.nDifficulty;
-            const int nInvulTicks = ((invulTimers[nHealth]/4) * (4-nSkill+1))>>1; // scale invul ticks depending on current difficulty
+            const int nSkill = gGameOptions.nDamageInvul-1;
+            const int nInvulTicks = ((invulTimers[nHealth]/4) * (nSkill+1))>>1; // scale invul ticks depending on current difficulty
             const char bInvulState = pPlayer->invulTime > (gFrameClock - nInvulTicks);
             if ((pPlayer->invulTime != gFrameClock) && bInvulState) // if invulnerability timer has not lapsed for difficulty, bypass damage calculation
                 return 0;
@@ -2745,7 +2996,30 @@ int playerDamageSprite(int nSource, PLAYER *pPlayer, DAMAGE_TYPE nDamageType, in
         FragPlayer(pPlayer, nSource);
         trTriggerSprite(nSprite, pXSprite, kCmdOff, nSource);
 
-        if (gGameOptions.bPermaDeath && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording)
+        if ((gGameOptions.nGameType == kGameTypeCoop) && (gGameOptions.uNetGameFlags&kNetGameFlagLimitFrags) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording)
+        {
+            gPlayerCoopLives[pPlayer->nPlayer]++;
+            char buffer[80];
+            buffer[0] = '\0';
+            char bAllPlayersDead = 1;
+            for (int i = connecthead; i >= 0 && bAllPlayersDead; i = connectpoint2[i])
+            {
+                if (gPlayerCoopLives[i] < gPlayerRoundLimit)
+                    bAllPlayersDead = 0;
+            }
+            const int nPal = gColorMsg && !VanillaMode() ? playerColorPalMessage(pPlayer->teamId) : 0;
+            if (gPlayerCoopLives[pPlayer->nPlayer] >= gPlayerRoundLimit)
+                sprintf(buffer, "\r%s\r is outta lives!", gProfile[pPlayer->nPlayer].name);
+            else if (gPlayerRoundLimit - 1 == gPlayerCoopLives[pPlayer->nPlayer])
+                sprintf(buffer, "\r%s\r is on their last life!", gProfile[pPlayer->nPlayer].name);
+            else if (pPlayer == gMe)
+                sprintf(buffer, "You have %d lives left!", gPlayerRoundLimit - gPlayerCoopLives[pPlayer->nPlayer]);
+            if (buffer[0] != '\0')
+                viewSetMessageColor(buffer, 0, MESSAGE_PRIORITY_NORMAL, nPal, 0);
+            if (bAllPlayersDead)
+                viewSetMessage("press \"use\" or \"enter\" to restart level");
+        }
+        else if (gGameOptions.bPermaDeath && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording)
             viewSetMessage("game over. press \"use\" or \"enter\" to quit");
         else if (gRestoreLastSave && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1) && (pPlayer->pXSprite->health <= 0) && !gDemo.bPlaying && !gDemo.bRecording) // if died in single-player and not playing demo
         {

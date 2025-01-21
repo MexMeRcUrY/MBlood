@@ -66,6 +66,7 @@ int32_t JoystickAnalogueScale[MAXJOYAXES];
 int32_t JoystickAnalogueDead[MAXJOYAXES];
 int32_t JoystickAnalogueSaturate[MAXJOYAXES];
 int32_t JoystickAnalogueInvert[MAXJOYAXES];
+int32_t JoystickAnalogueAxisSoloDeadZone[MAXJOYAXES];
 uint8_t KeyboardKeys[NUMGAMEFUNCTIONS][2];
 int32_t scripthandle;
 int32_t setupread;
@@ -77,6 +78,7 @@ char szPlayerName[MAXPLAYERNAME];
 int32_t gTurnSpeed;
 int32_t gTurnAcceleration;
 int32_t gCenterViewOnDrop;
+int32_t gTargetAimAssist;
 int32_t gCrouchToggle;
 int32_t gDetail;
 int32_t gMouseAim;
@@ -110,6 +112,8 @@ int32_t gFollowMap;
 int32_t gOverlayMap;
 int32_t gRotateMap;
 int32_t gAimReticle;
+int32_t gAimReticleOffsetX;
+int32_t gAimReticleOffsetY;
 int32_t gSlopeTilting;
 int32_t gSlopeReticle;
 int32_t gMessageState;
@@ -128,6 +132,7 @@ int32_t gMouseAimingFlipped;
 int32_t gRunKeyMode;
 bool gNoClip;
 bool gNoTarget;
+bool gFlyMode;
 bool gInfiniteAmmo;
 bool gLifeleechRnd;
 bool gAlphaPitchfork;
@@ -160,14 +165,13 @@ int32_t gShowWeaponSelectPosition;
 int32_t gShowWeaponSelectScale;
 int32_t gShadowsFake3D;
 int32_t gSmokeTrail3D;
-int32_t gTransparentHitscanProjectiles;
 int32_t gParticlesDuration;
+int32_t gProjectileOldSprite;
 int32_t gPackSlotSwitch;
 int32_t gFMPianoFix;
 
 //////////
 int gVanilla;
-int gMonsterSettings;
 int gQuadDamagePowerup;
 int gDamageInvul;
 int gExplosionBehavior;
@@ -364,7 +368,11 @@ void CONFIG_SetDefaults(void)
     }
 #endif
 
+#ifdef USE_OPENGL
+    gSetup.bpp = 32;
+#else
     gSetup.bpp = 8;
+#endif
 
 #if defined(_WIN32)
     MixRate = 44100;
@@ -384,14 +392,15 @@ void CONFIG_SetDefaults(void)
     gSetup.usejoystick = 1;
 #else
     gSetup.usejoystick = 0;
-    gSetup.joystickrumble = 0;
 #endif
+    gSetup.joystickrumble = 0;
 
     gSetup.forcesetup       = 1;
     gSetup.noautoload       = 1;
     gSetup.quickstart       = 0;
     gSetup.fullscreen       = 1;
     gSetup.usemouse         = 1;
+    gSetup.firstlaunch      = 1;
     Bstrcpy(gSetup.lastini, BloodIniFile);
 
     //ud.config.AmbienceToggle  = 1;
@@ -452,8 +461,8 @@ void CONFIG_SetDefaults(void)
     gShowWeaponSelectScale = 10;
     gShadowsFake3D = 1;
     gSmokeTrail3D = 1;
-    gTransparentHitscanProjectiles = 0;
     gParticlesDuration = 1;
+    gProjectileOldSprite = 0;
     gPackSlotSwitch = 1;
     //ud.lockout                = 0;
     //ud.m_marker               = 1;
@@ -489,12 +498,13 @@ void CONFIG_SetDefaults(void)
     //ud.weaponswitch           = 3;  // new+empty
     gFov = 90;
     gRollAngle = 0;
-    gCenterHoriz = 0;
+    gCenterHoriz = 1;
     gDeliriumBlur = 1;
     gViewSize = 3;
     gTurnSpeed = 92;
     gTurnAcceleration = 1;
     gCenterViewOnDrop = 0;
+    gTargetAimAssist = 0;
     gCrouchToggle = 0;
     gDetail = 4;
     gAutoDivingSuit = 1;
@@ -510,7 +520,7 @@ void CONFIG_SetDefaults(void)
     gViewInterpolate = 1;
     gViewInterpolateMethod = 0;
     gPanningInterpolate = 1;
-    gWeaponInterpolate = 1;
+    gWeaponInterpolate = 2;
     gViewHBobbing = 1;
     gViewVBobbing = 1;
     gWeaponHBobbing = 1;
@@ -519,6 +529,8 @@ void CONFIG_SetDefaults(void)
     gOverlayMap = 0;
     gRotateMap = 0;
     gAimReticle = 1;
+    gAimReticleOffsetX = 0;
+    gAimReticleOffsetY = 0;
     gSlopeTilting = 0;
     gSlopeReticle = 0;
     gMessageState = 1;
@@ -545,7 +557,6 @@ void CONFIG_SetDefaults(void)
     gAutosaveInCurLevel = false;
 
     gVanilla = 0;
-    gMonsterSettings = 1;
     gQuadDamagePowerup = 0;
     gDamageInvul = 0;
     gExplosionBehavior = 0;
@@ -626,34 +637,40 @@ void CONFIG_SetDefaults(void)
 
         JoystickAnalogueInvert[i] = 0;
         CONTROL_SetAnalogAxisInvert(i, JoystickAnalogueInvert[i]);
+
+        JoystickAnalogueAxisSoloDeadZone[i] = 0;
+        JOYSTICK_SetAxisSoloDeadZone(i, JoystickAnalogueAxisSoloDeadZone[i]);
     }
 #else
     for (int i=0; i<MAXJOYBUTTONSANDHATS; i++)
     {
-        JoystickFunctions[i][0] = -1;
-        JoystickFunctions[i][1] = -1;
+        JoystickFunctions[i][0] = CONFIG_FunctionNameToNum(joystickdefaults[i]);
+        JoystickFunctions[i][1] = CONFIG_FunctionNameToNum(joystickclickeddefaults[i]);
         CONTROL_MapButton(JoystickFunctions[i][0], i, 0, controldevice_joystick);
         CONTROL_MapButton(JoystickFunctions[i][1], i, 1, controldevice_joystick);
     }
 
     for (int i=0; i<MAXJOYAXES; i++)
     {
-        JoystickAnalogueScale[i] = DEFAULTJOYSTICKANALOGUESCALE;
-        JoystickAnalogueDead[i] = DEFAULTJOYSTICKANALOGUEDEAD;
-        JoystickAnalogueSaturate[i] = DEFAULTJOYSTICKANALOGUESATURATE;
+        JoystickAnalogueScale[i] = joystickanalogscaledefaults[i];
+        JoystickAnalogueDead[i] = joystickanalogdeaddefaults[i];
+        JoystickAnalogueSaturate[i] = joystickanalogsaturatedefaults[i];
         CONTROL_SetAnalogAxisScale(i, JoystickAnalogueScale[i], controldevice_joystick);
         JOYSTICK_SetDeadZone(i, JoystickAnalogueDead[i], JoystickAnalogueSaturate[i]);
 
-        JoystickDigitalFunctions[i][0] = -1;
-        JoystickDigitalFunctions[i][1] = -1;
+        JoystickDigitalFunctions[i][0] = CONFIG_FunctionNameToNum(joystickdigitaldefaults[i*2]);
+        JoystickDigitalFunctions[i][1] = CONFIG_FunctionNameToNum(joystickdigitaldefaults[i*2+1]);
         CONTROL_MapDigitalAxis(i, JoystickDigitalFunctions[i][0], 0);
         CONTROL_MapDigitalAxis(i, JoystickDigitalFunctions[i][1], 1);
 
-        JoystickAnalogueAxes[i] = -1;
+        JoystickAnalogueAxes[i] = CONFIG_AnalogNameToNum(joystickanalogdefaults[i]);
         CONTROL_MapAnalogAxis(i, JoystickAnalogueAxes[i]);
 
         JoystickAnalogueInvert[i] = 0;
         CONTROL_SetAnalogAxisInvert(i, JoystickAnalogueInvert[i]);
+
+        JoystickAnalogueAxisSoloDeadZone[i] = joystickanalogaxissolodeadzone[i];
+        JOYSTICK_SetAxisSoloDeadZone(i, JoystickAnalogueAxisSoloDeadZone[i]);
     }
 #endif
 }
@@ -815,6 +832,11 @@ void CONFIG_SetupJoystick(void)
         scale = JoystickAnalogueInvert[i];
         SCRIPT_GetNumber(scripthandle, "Controls", str,&scale);
         JoystickAnalogueInvert[i] = scale;
+
+        Bsprintf(str,"JoystickAnalogAxisSoloDeadZone%d",i);
+        scale = JoystickAnalogueAxisSoloDeadZone[i];
+        SCRIPT_GetNumber(scripthandle, "Controls", str,&scale);
+        JoystickAnalogueAxisSoloDeadZone[i] = scale;
     }
 
     for (i=0; i<MAXJOYBUTTONSANDHATS; i++)
@@ -830,6 +852,7 @@ void CONFIG_SetupJoystick(void)
         CONTROL_SetAnalogAxisScale(i, JoystickAnalogueScale[i], controldevice_joystick);
         JOYSTICK_SetDeadZone(i, JoystickAnalogueDead[i], JoystickAnalogueSaturate[i]);
         CONTROL_SetAnalogAxisInvert(i, JoystickAnalogueInvert[i]);
+        JOYSTICK_SetAxisSoloDeadZone(i, JoystickAnalogueAxisSoloDeadZone[i]);
     }
 }
 
@@ -872,7 +895,6 @@ int CONFIG_ReadSetup(void)
     SCRIPT_GetNumber(scripthandle, "Game Options", "LockManualSaving", &gLockManualSaving);
     SCRIPT_GetNumber(scripthandle, "Game Options", "RestoreLastSave", &gRestoreLastSave);
     SCRIPT_GetNumber(scripthandle, "Game Options", "VanillaMode", &gVanilla);
-    SCRIPT_GetNumber(scripthandle, "Game Options", "MonsterSettings", &gMonsterSettings);
     SCRIPT_GetNumber(scripthandle, "Game Options", "QuadDamagePowerup", &gQuadDamagePowerup);
     SCRIPT_GetNumber(scripthandle, "Game Options", "DamageInvul", &gDamageInvul);
     SCRIPT_GetNumber(scripthandle, "Game Options", "ExplosionsBehavior", &gExplosionBehavior);
@@ -906,7 +928,7 @@ int CONFIG_ReadSetup(void)
 
     char nameBuf[64];
 
-    while (Bstrlen(OSD_StripColors(nameBuf, tempbuf)) > 10)
+    while (Bstrlen(OSD_StripColors(nameBuf, tempbuf)) >= MAXPLAYERNAME)
         tempbuf[Bstrlen(tempbuf) - 1] = '\0';
 
     Bstrncpyz(szPlayerName, tempbuf, sizeof(szPlayerName));
@@ -917,6 +939,10 @@ int CONFIG_ReadSetup(void)
     SCRIPT_GetNumber(scripthandle, "Setup", "ForceSetup", &gSetup.forcesetup);
     SCRIPT_GetNumber(scripthandle, "Setup", "NoAutoLoad", &gSetup.noautoload);
     SCRIPT_GetNumber(scripthandle, "Setup", "QuickStart", &gSetup.quickstart);
+    SCRIPT_GetNumber(scripthandle, "Setup", "InputJoystick", &gSetup.usejoystick);
+    SCRIPT_GetNumber(scripthandle, "Setup", "UseJoystickRumble", &gSetup.joystickrumble);
+    SCRIPT_GetNumber(scripthandle, "Setup", "InputMouse", &gSetup.usemouse);
+    SCRIPT_GetNumber(scripthandle, "Setup", "FirstLaunch", &gSetup.firstlaunch);
     SCRIPT_GetString(scripthandle, "Setup", "LastINI", &gSetup.lastini[0]);
     gSetup.lastini[BMAX_PATH-1] = '\0';
 
@@ -1052,6 +1078,10 @@ void CONFIG_WriteSetup(uint32_t flags)
     SCRIPT_PutNumber(scripthandle, "Setup", "ForceSetup", gSetup.forcesetup, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Setup", "NoAutoLoad", gSetup.noautoload, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Setup", "QuickStart", gSetup.quickstart, FALSE, FALSE);
+    SCRIPT_PutNumber(scripthandle, "Setup", "InputJoystick", gSetup.usejoystick, FALSE, FALSE);
+    SCRIPT_PutNumber(scripthandle, "Setup", "UseJoystickRumble", gSetup.joystickrumble, FALSE, FALSE);
+    SCRIPT_PutNumber(scripthandle, "Setup", "InputMouse", gSetup.usemouse, FALSE, FALSE);
+    SCRIPT_PutNumber(scripthandle, "Setup", "FirstLaunch", gSetup.firstlaunch, FALSE, FALSE);
     SCRIPT_PutString(scripthandle, "Setup", "LastINI", &gSetup.lastini[0]);
 
 #ifdef POLYMER
@@ -1150,6 +1180,9 @@ void CONFIG_WriteSetup(uint32_t flags)
 
             Bsprintf(buf, "JoystickAnalogInvert%d", dummy);
             SCRIPT_PutNumber(scripthandle, "Controls", buf, JoystickAnalogueInvert[dummy], FALSE, FALSE);
+
+            Bsprintf(buf, "JoystickAnalogAxisSoloDeadZone%d", dummy);
+            SCRIPT_PutNumber(scripthandle, "Controls", buf, JoystickAnalogueAxisSoloDeadZone[dummy], FALSE, FALSE);
         }
     }
 
@@ -1170,7 +1203,6 @@ void CONFIG_WriteSetup(uint32_t flags)
     SCRIPT_PutNumber(scripthandle, "Game Options", "LockManualSaving", gLockManualSaving, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Game Options", "RestoreLastSave", gRestoreLastSave, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Game Options", "VanillaMode", gVanilla, FALSE, FALSE);
-    SCRIPT_PutNumber(scripthandle, "Game Options", "MonsterSettings", gMonsterSettings, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Game Options", "QuadDamagePowerup", gQuadDamagePowerup, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Game Options", "DamageInvul", gDamageInvul, FALSE, FALSE);
     SCRIPT_PutNumber(scripthandle, "Game Options", "ExplosionsBehavior", gExplosionBehavior, FALSE, FALSE);

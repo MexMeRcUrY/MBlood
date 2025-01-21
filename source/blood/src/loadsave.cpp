@@ -163,7 +163,6 @@ void LoadSave::LoadGame(char *pzFile)
     totalclock = 0;
     gPaused = 0;
     gGameStarted = 1;
-    
 
 #ifdef USE_STRUCT_TRACKERS
     Bmemset(sectorchanged, 0, sizeof(sectorchanged));
@@ -218,18 +217,8 @@ void LoadSave::LoadGame(char *pzFile)
 
     if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // if single-player, update the game options/player profile by loading the current set settings
     {
-        if (!VanillaMode())
-        {
-            gGameOptions.nMonsterSettings = ClipRange(gMonsterSettings, 0, 2);
-            if (gMonsterSettings <= 1)
-                gGameOptions.nMonsterRespawnTime = 3600; // default (30 secs)
-            else if (gMonsterSettings == 2)
-                gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
-            else
-                gGameOptions.nMonsterRespawnTime = (gMonsterSettings - 2) * 30 * kTicRate;
-        }
         gGameOptions.bQuadDamagePowerup = gQuadDamagePowerup;
-        gGameOptions.bDamageInvul = gDamageInvul;
+        gGameOptions.nDamageInvul = gDamageInvul;
         gGameOptions.nExplosionBehavior = gExplosionBehavior;
         gGameOptions.nProjectileBehavior = gProjectileBehavior;
         gGameOptions.bNapalmFalloff = gNapalmFalloff;
@@ -243,9 +232,33 @@ void LoadSave::LoadGame(char *pzFile)
     }
 }
 
+// TODO: when starting to use buildvfs in SaveGame(), remove this function and use buildvfs_exists() instead
+static int file_exists(char const* path)
+{
+#ifdef _WIN32
+    return GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES;
+#else
+    struct Bstat st;
+    return !Bstat(path, &st);
+#endif
+}
+
 void LoadSave::SaveGame(char *pzFile)
 {
-    hSFile = fopen(pzFile, "wb");
+    // TODO: use buildvfs_open_write() etc (probably in the whole file?)
+    char fileNameTmp[BMAX_PATH+4];
+    const char* saveFileName = pzFile;
+    bool saveFileExists = file_exists(saveFileName);
+    if (saveFileExists)
+    {
+        // write to a different file first, so in case the game crashes while saving
+        // (which would result in a corrupted savegame) at least the old savegame is preserved
+        strcpy(fileNameTmp, pzFile);
+        strcat(fileNameTmp, "_tmp");
+        saveFileName = fileNameTmp;
+    }
+
+    hSFile = fopen(saveFileName, "wb");
     if (hSFile == NULL)
         ThrowError("File error #%d creating save file.", errno);
     LoadSave *rover = head.next;
@@ -256,6 +269,15 @@ void LoadSave::SaveGame(char *pzFile)
     }
     fclose(hSFile);
     hSFile = NULL;
+    if (saveFileExists)
+    {
+        // the savegame was written successfully, so we can rename the saved file
+        // to the requested name (from gameXXX.sav_tmp to gameXXX.sav)
+#ifdef _WIN32
+        _unlink(pzFile);
+#endif
+        rename(saveFileName, pzFile);
+    }
 }
 
 class MyLoadSave : public LoadSave
@@ -367,7 +389,8 @@ void MyLoadSave::Load(void)
     Read(yvel, nNumSprites*sizeof(yvel[0]));
     Read(zvel, nNumSprites*sizeof(zvel[0]));
     Read(&gMapRev, sizeof(gMapRev));
-    Read(&gSongId, sizeof(gSkyCount));
+    Read(&gSongId, sizeof(gSongId));
+    Read(&gSkyCount, sizeof(gSkyCount));
     Read(&gFogMode, sizeof(gFogMode));
 #ifdef NOONE_EXTENSIONS
     Read(&gModernMap, sizeof(gModernMap));
@@ -477,7 +500,8 @@ void MyLoadSave::Save(void)
     Write(yvel, nNumSprites*sizeof(yvel[0]));
     Write(zvel, nNumSprites*sizeof(zvel[0]));
     Write(&gMapRev, sizeof(gMapRev));
-    Write(&gSongId, sizeof(gSkyCount));
+    Write(&gSongId, sizeof(gSongId));
+    Write(&gSkyCount, sizeof(gSkyCount));
     Write(&gFogMode, sizeof(gFogMode));
 #ifdef NOONE_EXTENSIONS
     Write(&gModernMap, sizeof(gModernMap));
@@ -491,6 +515,8 @@ void MyLoadSave::Save(void)
 
 void LoadSavedInfo(void)
 {
+    int const bakpathsearchmode = pathsearchmode;
+    pathsearchmode = 1;
     const int nNameMin = strlen("##.sav"); // length offset for string numbers
     auto pList = klistpath((g_modDir[0] != '/') ? g_modDir : "./", "game00*.sav", BUILDVFS_FIND_FILE);
     for (auto pIterator = pList; pIterator != NULL; pIterator = pIterator->next)
@@ -536,10 +562,13 @@ void LoadSavedInfo(void)
         kclose(hFile);
     }
     klistfree(pList);
+    pathsearchmode = bakpathsearchmode;
 }
 
 void LoadAutosavedInfo(void)
 {
+    int const bakpathsearchmode = pathsearchmode;
+    pathsearchmode = 1;
     const int nNameMin = strlen("#.sav"); // length offset for string numbers
     auto pList = klistpath((g_modDir[0] != '/') ? g_modDir : "./", "gameautosave*.sav", BUILDVFS_FIND_FILE);
     for (auto pIterator = pList; pIterator != NULL; pIterator = pIterator->next)
@@ -585,6 +614,7 @@ void LoadAutosavedInfo(void)
         kclose(hFile);
     }
     klistfree(pList);
+    pathsearchmode = bakpathsearchmode;
 }
 
 bool LoadSavedInCurrentSession(int nSlot)
@@ -667,7 +697,19 @@ void LoadSaveSetup(void)
     void nnExtLoadSaveConstruct(void);
 #endif
     myLoadSave = new MyLoadSave();
+    
+    // NoOne: Seq must be in top of AI because of AISTATE callbacks (and seq callbacks in general).
+    // Ex: cultist throwing TNT - if you saved the game while it plays animation
+    // before fire trigger seq flag, you will get assertion fail on load since
+    // target == -1 after aiInitSprite() call.
 
+    // Another reason is that it just spawns the wrong animation.
+    // Ex: save the game when some dude moves, load it and quckly
+    // use ONERING cheat. You will see that dude plays moving
+    // animation, but have idle AISTATE after aiInitSprite()
+    // call. In vanilla they just stand still.
+
+    SeqLoadSaveConstruct();
     ActorLoadSaveConstruct();
     AILoadSaveConstruct();
     EndGameLoadSaveConstruct();
@@ -676,7 +718,6 @@ void LoadSaveSetup(void)
     MessagesLoadSaveConstruct();
     MirrorLoadSaveConstruct();
     PlayerLoadSaveConstruct();
-    SeqLoadSaveConstruct();
     TriggersLoadSaveConstruct();
     ViewLoadSaveConstruct();
     WarpLoadSaveConstruct();

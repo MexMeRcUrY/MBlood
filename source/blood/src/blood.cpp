@@ -116,8 +116,6 @@ char *pUserTiles = NULL;
 char *pUserSoundRFF = NULL;
 char *pUserRFF = NULL;
 
-int gChokeCounter = 0;
-
 double g_gameUpdateTime, g_gameUpdateAndDrawTime;
 double g_gameUpdateAvgTime = 0.001;
 
@@ -129,6 +127,9 @@ bool gSaveGameActive;
 int gCacheMiss;
 int gMenuPicnum = 2518; // default menu picnum
 
+char bVanilla = 0;
+char bDemoState = 0;
+
 bool gNetPortOverride = false;
 char gNetMapOverride[BMAX_PATH] = "";
 bool gNetRetry = false;
@@ -136,12 +137,16 @@ bool gNetRetry = false;
 int gMultiModeInit = -1;
 int gMultiLength = -1;
 int gMultiLimit = -1;
+bool gMultiModeNoExit = false;
+bool gMultiModeNoFlag = false;
 int gMultiEpisodeInit = -1;
 int gMultiLevelInit = -1;
 int gMultiDiffInit = -1;
 int gMultiMonsters = -1;
 int gMultiWeapons = -1;
 int gMultiItems = -1;
+int gMultiSpawnLocation = -1;
+int gMultiSpawnProtection = -1;
 
 enum gametokens
 {
@@ -237,7 +242,9 @@ void PrecacheDude(spritetype *pSprite)
     switch (pSprite->type)
     {
     case kDudeCultistTommy:
+    case kDudeCultistTommyProne:
     case kDudeCultistShotgun:
+    case kDudeCultistShotgunProne:
     case kDudeCultistTesla:
     case kDudeCultistTNT:
         seqPrecacheId(pDudeInfo->seqStartID+6);
@@ -247,6 +254,13 @@ void PrecacheDude(spritetype *pSprite)
         seqPrecacheId(pDudeInfo->seqStartID+13);
         seqPrecacheId(pDudeInfo->seqStartID+14);
         seqPrecacheId(pDudeInfo->seqStartID+15);
+        // Cultist falling tiles
+        for (int i = 0; i < 5; i++)
+        {
+            tilePrecacheTile(2890+i, 0);
+            tilePrecacheTile(2895+i, 0);
+            tilePrecacheTile(2900+i, 0);
+        }
         break;
     case kDudeZombieButcher:
     case kDudeGillBeast:
@@ -274,8 +288,20 @@ void PrecacheDude(spritetype *pSprite)
     case kDudeSpiderBrown:
     case kDudeSpiderRed:
     case kDudeSpiderBlack:
-    case kDudeSpiderMother:
     case kDudeTchernobog:
+        seqPrecacheId(pDudeInfo->seqStartID+6);
+        seqPrecacheId(pDudeInfo->seqStartID+7);
+        seqPrecacheId(pDudeInfo->seqStartID+8);
+        break;
+    case kDudeSpiderMother:
+        seqPrecacheId(pDudeInfo->seqStartID+6);
+        seqPrecacheId(pDudeInfo->seqStartID+7);
+        seqPrecacheId(pDudeInfo->seqStartID+8);
+        pDudeInfo = getDudeInfo(kDudeSpiderBrown);
+        seqPrecacheId(pDudeInfo->seqStartID+6);
+        seqPrecacheId(pDudeInfo->seqStartID+7);
+        seqPrecacheId(pDudeInfo->seqStartID+8);
+        pDudeInfo = getDudeInfo(kDudeSpiderRed);
         seqPrecacheId(pDudeInfo->seqStartID+6);
         seqPrecacheId(pDudeInfo->seqStartID+7);
         seqPrecacheId(pDudeInfo->seqStartID+8);
@@ -407,6 +433,29 @@ void PreloadTiles(void)
     seqPrecacheId(dudeInfo[31].seqStartID+16);
     seqPrecacheId(dudeInfo[31].seqStartID+17);
     seqPrecacheId(dudeInfo[31].seqStartID+18);
+
+    // Player cultist model for bloodbath
+    if (gGameOptions.nGameType != kGameTypeSinglePlayer)
+    {
+        DUDEINFO *pDudeInfo = getDudeInfo(kDudeCultistTommy);
+        seqPrecacheId(pDudeInfo->seqStartID);
+        seqPrecacheId(pDudeInfo->seqStartID+5);
+        seqPrecacheId(pDudeInfo->seqStartID+1);
+        seqPrecacheId(pDudeInfo->seqStartID+2);
+        seqPrecacheId(pDudeInfo->seqStartID+6);
+        seqPrecacheId(pDudeInfo->seqStartID+7);
+        seqPrecacheId(pDudeInfo->seqStartID+8);
+        seqPrecacheId(pDudeInfo->seqStartID+9);
+        seqPrecacheId(pDudeInfo->seqStartID+13);
+        seqPrecacheId(pDudeInfo->seqStartID+14);
+        seqPrecacheId(pDudeInfo->seqStartID+15);
+        for (int i = 0; i < 5; i++)
+        {
+            tilePrecacheTile(2890+i, 0);
+            tilePrecacheTile(2895+i, 0);
+            tilePrecacheTile(2900+i, 0);
+        }
+    }
 
     if (skyTile > -1 && skyTile < kMaxTiles)
     {
@@ -594,6 +643,7 @@ void G_Polymer_UnInit(void)
 
 PLAYER gPlayerTemp[kMaxPlayers];
 int gHealthTemp[kMaxPlayers];
+int gChokeCounter[kMaxPlayers];
 
 vec3_t startpos;
 int16_t startang, startsectnum;
@@ -625,18 +675,8 @@ void StartLevel(GAMEOPTIONS *gameOptions)
             playCutscene(gGameOptions.nEpisode, kGameFlagPlayIntro);
 
         ///////
-        if (!VanillaMode())
-        {
-            gGameOptions.nMonsterSettings = ClipRange(gMonsterSettings, 0, 2);
-            if (gMonsterSettings <= 1)
-                gGameOptions.nMonsterRespawnTime = 3600; // default (30 secs)
-            else if (gMonsterSettings == 2)
-                gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
-            else
-                gGameOptions.nMonsterRespawnTime = (gMonsterSettings - 2) * 30 * kTicRate;
-        }
         gGameOptions.bQuadDamagePowerup = gQuadDamagePowerup;
-        gGameOptions.bDamageInvul = gDamageInvul;
+        gGameOptions.nDamageInvul = gDamageInvul;
         gGameOptions.nExplosionBehavior = gExplosionBehavior;
         gGameOptions.nProjectileBehavior = gProjectileBehavior;
         gGameOptions.bNapalmFalloff = gNapalmFalloff;
@@ -657,13 +697,13 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         gGameOptions.nGameType = gPacketStartGame.gameType;
         gGameOptions.uNetGameFlags = gPacketStartGame.uNetGameFlags;
         gGameOptions.nDifficulty = gPacketStartGame.difficulty;
-        gGameOptions.nMonsterSettings = ClipRange(gPacketStartGame.monsterSettings, 0, 2);
-        if (gPacketStartGame.monsterSettings <= 1)
+        gGameOptions.nMonsterSettings = gPacketStartGame.monsterSettings;
+        if (gGameOptions.nMonsterSettings <= 1)
             gGameOptions.nMonsterRespawnTime = 3600; // default (30 secs)
-        else if (gPacketStartGame.monsterSettings == 2)
+        else if (gGameOptions.nMonsterSettings == 2)
             gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
         else
-            gGameOptions.nMonsterRespawnTime = (gPacketStartGame.monsterSettings - 2) * 30 * kTicRate;
+            gGameOptions.nMonsterRespawnTime = (gGameOptions.nMonsterSettings - 2) * 30 * kTicRate, gGameOptions.nMonsterSettings = ClipRange(gGameOptions.nMonsterSettings, 0, 2);
         gGameOptions.nEnemyQuantity = gPacketStartGame.monsterQuantity;
         gGameOptions.nEnemyHealth = gPacketStartGame.monsterHealth;
         gGameOptions.nEnemySpeed = gPacketStartGame.monsterSpeed;
@@ -683,7 +723,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
 
         ///////
         gGameOptions.bQuadDamagePowerup = gPacketStartGame.bQuadDamagePowerup;
-        gGameOptions.bDamageInvul = gPacketStartGame.bDamageInvul;
+        gGameOptions.nDamageInvul = gPacketStartGame.nDamageInvul;
         gGameOptions.nExplosionBehavior = gPacketStartGame.nExplosionBehavior;
         gGameOptions.nProjectileBehavior = gPacketStartGame.nProjectileBehavior;
         gGameOptions.bNapalmFalloff = gPacketStartGame.bNapalmFalloff;
@@ -782,8 +822,6 @@ void StartLevel(GAMEOPTIONS *gameOptions)
             }
             else if (bRandomItem) // randomize pickups
                 dbRandomizerMode(pSprite);
-            if (gGameOptions.bQuadDamagePowerup && (pSprite->picnum == gPowerUpInfo[kPwUpTwoGuns].picnum) && (pSprite->type == kItemTwoGuns)) // if quad damage is enabled, use new quad damage voxel from notblood.pk3
-                pSprite->picnum = 30463;
         }
         if (dbIsBannedSprite(pSprite, pXSprite)) // if sprite is banned type, remove sprite
         {
@@ -847,6 +885,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         else if ((gGameOptions.nGameType == kGameTypeTeams) && !VanillaMode()) // if ctf mode and went to next level, reset scores
             playerResetScores(i);
         playerStart(i, 1);
+        gChokeCounter[i] = 0;
     }
     playerInitRoundCheck();
     if (gameOptions->uGameFlags&kGameFlagContinuing) // if episode is in progress, restore player stats
@@ -888,7 +927,6 @@ void StartLevel(GAMEOPTIONS *gameOptions)
     netResetState();
     gCacheMiss = 0;
     gFrame = 0;
-    gChokeCounter = 0;
     if (!gDemo.bPlaying)
         gGameMenuMgr.Deactivate();
     levelTryPlayMusicOrNothing(gGameOptions.nEpisode, gGameOptions.nLevel);
@@ -906,65 +944,6 @@ void StartLevel(GAMEOPTIONS *gameOptions)
     gAutosaveInCurLevel = false;
     if (bTriggerAutosave && !gGameOptions.bPermaDeath)
         AutosaveGame(true); // create autosave at start of the new level
-}
-
-void StartNetworkLevel(void)
-{
-    if (gDemo.bRecording)
-        gDemo.Close();
-    VanillaModeUpdate();
-    if (!(gGameOptions.uGameFlags&kGameFlagContinuing))
-    {
-        gGameOptions.nEpisode = gPacketStartGame.episodeId;
-        gGameOptions.nLevel = gPacketStartGame.levelId;
-        gGameOptions.nGameType = gPacketStartGame.gameType;
-        gGameOptions.uNetGameFlags = gPacketStartGame.uNetGameFlags;
-        gGameOptions.nDifficulty = gPacketStartGame.difficulty;
-        gGameOptions.nMonsterSettings = ClipRange(gPacketStartGame.monsterSettings, 0, 2);
-        if (gPacketStartGame.monsterSettings <= 1)
-            gGameOptions.nMonsterRespawnTime = 3600; // default (30 secs)
-        else if (gPacketStartGame.monsterSettings == 2)
-            gGameOptions.nMonsterRespawnTime = 15 * kTicRate; // 15 secs
-        else
-            gGameOptions.nMonsterRespawnTime = (gPacketStartGame.monsterSettings - 2) * 30 * kTicRate;
-        gGameOptions.nEnemyQuantity = gPacketStartGame.monsterQuantity;
-        gGameOptions.nEnemyHealth = gPacketStartGame.monsterHealth;
-        gGameOptions.nEnemySpeed = gPacketStartGame.monsterSpeed;
-        gGameOptions.nWeaponSettings = gPacketStartGame.weaponSettings;
-        gGameOptions.nItemSettings = gPacketStartGame.itemSettings;
-        gGameOptions.nRespawnSettings = gPacketStartGame.respawnSettings;
-        gGameOptions.bFriendlyFire = gPacketStartGame.bFriendlyFire;
-        gGameOptions.nKeySettings = gPacketStartGame.keySettings;
-        gGameOptions.bItemWeaponSettings = gPacketStartGame.itemWeaponSettings;
-        gGameOptions.bAutoTeams = gPacketStartGame.bAutoTeams;
-        gGameOptions.nSpawnProtection = gPacketStartGame.nSpawnProtection;
-        gGameOptions.nSpawnWeapon = gPacketStartGame.nSpawnWeapon;
-        if (gPacketStartGame.userMap)
-            levelAddUserMap(gNetMapOverride[0] != '\0' ? gNetMapOverride : gPacketStartGame.userMapName);
-        else
-            levelSetupOptions(gGameOptions.nEpisode, gGameOptions.nLevel);
-        
-        ///////
-        gGameOptions.bQuadDamagePowerup = gPacketStartGame.bQuadDamagePowerup;
-        gGameOptions.bDamageInvul = gPacketStartGame.bDamageInvul;
-        gGameOptions.nExplosionBehavior = gPacketStartGame.nExplosionBehavior;
-        gGameOptions.nProjectileBehavior = gPacketStartGame.nProjectileBehavior;
-        gGameOptions.bNapalmFalloff = gPacketStartGame.bNapalmFalloff;
-        gGameOptions.nEnemyBehavior = gPacketStartGame.nEnemyBehavior;
-        gGameOptions.bEnemyRandomTNT = gPacketStartGame.bEnemyRandomTNT;
-        gGameOptions.nWeaponsVer = gPacketStartGame.nWeaponsVer;
-        gGameOptions.bSectorBehavior = gPacketStartGame.bSectorBehavior;
-        gGameOptions.nHitscanProjectiles = gPacketStartGame.nHitscanProjectiles;
-        gGameOptions.nRandomizerMode = gPacketStartGame.randomizerMode;
-        Bstrncpyz(gGameOptions.szRandomizerSeed, gPacketStartGame.szRandomizerSeed, sizeof(gGameOptions.szRandomizerSeed));
-        gGameOptions.nRandomizerCheat = -1;
-        gGameOptions.bEnemyShuffle = false;
-        gGameOptions.bPitchforkOnly = false;
-        gGameOptions.bPermaDeath = false;
-        gGameOptions.uSpriteBannedFlags = gPacketStartGame.uSpriteBannedFlags;
-        ///////
-    }
-    StartLevel(&gGameOptions);
 }
 
 static void DoQuickLoad(void)
@@ -1284,14 +1263,15 @@ void ProcessFrame(void)
         }
         if (gPlayer[i].input.keyFlags.restart) // if restart requested from ProcessInput()
         {
+            const char bSinglePlayer = (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1);
             gPlayer[i].input.keyFlags.restart = 0;
-            if (gGameOptions.bPermaDeath && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // quit to main menu
+            if (gGameOptions.bPermaDeath && bSinglePlayer) // quit to main menu
             {
                 gQuitGame = true;
                 gRestartGame = true;
                 return;
             }
-            if (gPlayer[i].input.keyFlags.action && gGameOptions.nGameType == kGameTypeSinglePlayer && numplayers == 1) // if pressed action key and not in multiplayer session
+            if (gPlayer[i].input.keyFlags.action && bSinglePlayer) // if pressed action key
             {
                 if (DoRestoreSave()) // attempt to load last save, if fail then restart current level
                     return;
@@ -1320,16 +1300,26 @@ void ProcessFrame(void)
             gDemo.Write(gFifoInput[(gNetFifoTail-1)&255]);
         else if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1)) // always use current global settings for player while in single-player
         {
-            gProfile[myconnectindex].nWeaponHBobbing = gWeaponHBobbing;
             gProfile[myconnectindex].nAutoAim = gAutoAim;
             gProfile[myconnectindex].nWeaponSwitch = gWeaponSwitch;
             gProfile[myconnectindex].bWeaponFastSwitch = gWeaponFastSwitch;
+            gProfile[myconnectindex].nWeaponHBobbing = gWeaponHBobbing;
         }
     }
     for (int i = connecthead; i >= 0; i = connectpoint2[i])
     {
+        PLAYER *pPlayer = &gPlayer[i];
         viewBackupView(i);
-        playerProcess(&gPlayer[i]);
+        playerProcess(pPlayer);
+        if (pPlayer->hand == 1)
+        {
+            gChokeCounter[i] += (kTicsPerFrame<<1);
+            while (gChokeCounter[i] >= kTicsPerSec)
+            {
+                gChoke.Process(pPlayer);
+                gChokeCounter[i] -= kTicsPerSec;
+            }
+        }
     }
     trProcessBusy();
     evProcess((int)gFrameClock);
@@ -1346,15 +1336,6 @@ void ProcessFrame(void)
     viewUpdateDelirium();
     viewUpdateShake();
     sfxUpdate3DSounds();
-    if (gMe->hand == 1)
-    {
-        gChokeCounter += (kTicsPerFrame<<1);
-        while (gChokeCounter >= kTicsPerSec)
-        {
-            gChoke.Process(gMe);
-            gChokeCounter -= kTicsPerSec;
-        }
-    }
     gLevelTime++;
     gFrame++;
     gFrameClock += kTicsPerFrame;
@@ -1409,7 +1390,7 @@ SWITCH switches[] = {
     { "robust", 8, 0 },
     { "setupfile", 9, 1 },
     { "skill", 10, 1 },
-    //{ "nocd", 11, 0 },
+    { "s", 11, 1 },
     //{ "8250", 12, 0 },
     { "ini", 13, 1 },
     { "noaim", 14, 0 },
@@ -1450,15 +1431,19 @@ SWITCH switches[] = {
     { "mp_mode", 45, 1 },
     { "mp_length", 46, 1 },
     { "mp_limit", 47, 1 },
-    { "mp_level", 48, 2 },
-    { "mp_diff", 49, 1 },
-    { "mp_dudes", 50, 1 },
-    { "mp_weaps", 51, 1 },
-    { "mp_items", 52, 1 },
-    { "mp_map", 53, 1 },
-    { "mp_mapclient", 54, 1 },
-    { "netretry", 55, 0 },
-    { "clientport", 56, 1 },
+    { "mp_noexit", 48, 0 },
+    { "mp_noflag", 49, 0 },
+    { "mp_level", 50, 2 },
+    { "mp_diff", 51, 1 },
+    { "mp_dudes", 52, 1 },
+    { "mp_weaps", 53, 1 },
+    { "mp_items", 54, 1 },
+    { "mp_spawn", 55, 1 },
+    { "mp_protect", 56, 1 },
+    { "mp_map", 57, 1 },
+    { "mp_mapclient", 58, 1 },
+    { "netretry", 59, 0 },
+    { "clientport", 60, 1 },
     { NULL, 0, 0 }
 };
 
@@ -1505,11 +1490,15 @@ void PrintHelp(void)
         "-mp_mode [0-2]\tSet game mode for multiplayer (0: co-op, 1: bloodbath, 2: teams)\n"
         "-mp_length [0-2]\tSet score/time length for multiplayer (0: unlimited, 1: minutes, 2: frags)\n"
         "-mp_limit [1-255]\tSet limit setting for multiplayer\n"
+        "-mp_noexit\tDisables the exit button for multiplayer\n"
+        "-mp_noflag\tRemoves the flag for multiplayer teams mode\n"
         "-mp_level [E M]\tSet level for multiplayer (e.g: 1 3)\n"
         "-mp_diff [0-4]\tSet difficulty for multiplayer (0-4)\n"
         "-mp_dudes [0-2]\tSet monster settings for multiplayer (0: none, 1: spawn, 2: respawn)\n"
         "-mp_weaps [0-3]\tSet weapon settings for multiplayer (0: don't respawn, 1: permanent, 2: respawn, 3: respawn with markers)\n"
         "-mp_items [0-2]\tSet item settings for multiplayer (0: don't respawn, 1: respawn, 2: respawn with markers)\n"
+        "-mp_spawn [0-2]\tSet the spawn location logic for multiplayer (0: random, 1: smart random, 2: distance)\n"
+        "-mp_protect [0-3]\tSet the spawn protect length for multiplayer\n"
         "-mp_map [map]\tSet user map path for multiplayer (e.g: filename.map)\n"
         "-mp_mapclient [map]\tOverride user map for multiplayer clients (e.g: filename.map)\n"
         "-netretry\t\tReattempts client connection automatically (hold down escape to end loop)\n"
@@ -1697,11 +1686,7 @@ void ParseOptions(void)
         case 10:
             if (OptArgc < 1)
                 ThrowError("Missing argument");
-            gSkill = strtoul(OptArgv[0], NULL, 0);
-            if (gSkill < 0)
-                gSkill = 0;
-            else if (gSkill > 4)
-                gSkill = 4;
+            gSkill = ClipRange(strtoul(OptArgv[0], NULL, 0), 0, 4);
             break;
         case 15:
             break;
@@ -1737,7 +1722,12 @@ void ParseOptions(void)
             break;
         }
         case 11:
-            //bNoCDAudio = 1;
+            if (OptArgc < 1)
+                ThrowError("Missing argument");
+            gSkill = ClipRange(strtoul(OptArgv[0], NULL, 0), 0, 4);
+            gGameOptions.nDifficulty = gSkill;
+            gGameOptions.nEnemyQuantity = gSkill;
+            gGameOptions.nEnemyHealth = gSkill;
             break;
         case 32:
             LOG_F(INFO, "Autoload disabled");
@@ -1821,46 +1811,62 @@ void ParseOptions(void)
                 ThrowError("Missing argument");
             gMultiLimit = ClipRange(atoi(OptArgv[0]), 1, 255);
             break;
-        case 48: // mp_level
+        case 48: // mp_noexit
+            gMultiModeNoExit = true;
+            break;
+        case 49: // mp_noflag
+            gMultiModeNoFlag = true;
+            break;
+        case 50: // mp_level
             if (OptArgc < 2)
                 ThrowError("Missing argument");
             gMultiEpisodeInit = ClipRange(atoi(OptArgv[0]), 1, kMaxEpisodes)-1;
             gMultiLevelInit = ClipRange(atoi(OptArgv[1]), 1, kMaxLevels)-1;
             break;
-        case 49: // mp_difficulty
+        case 51: // mp_difficulty
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             gMultiDiffInit = ClipRange(atoi(OptArgv[0]), 0, 4);
             break;
-        case 50: // mp_dudes
+        case 52: // mp_dudes
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             gMultiMonsters = ClipRange(atoi(OptArgv[0]), 0, 2);
             break;
-        case 51: // mp_weaps
+        case 53: // mp_weaps
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             gMultiWeapons = ClipRange(atoi(OptArgv[0]), 0, 3);
             break;
-        case 52: // mp_items
+        case 54: // mp_items
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             gMultiItems = ClipRange(atoi(OptArgv[0]), 0, 2);
             break;
-        case 53: // mp_map
+        case 55: // mp_spawn
+            if (OptArgc < 1)
+                ThrowError("Missing argument");
+            gMultiSpawnLocation = ClipRange(atoi(OptArgv[0]), 0, 2);
+            break;
+        case 56: // mp_protect
+            if (OptArgc < 1)
+                ThrowError("Missing argument");
+            gMultiSpawnProtection = ClipRange(atoi(OptArgv[0]), 0, 3);
+            break;
+        case 57: // mp_map
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             Bstrncpyz(zUserMapName, OptArgv[0], sizeof(zUserMapName));
             break;
-        case 54: // mp_mapclient
+        case 58: // mp_mapclient
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             Bstrncpyz(gNetMapOverride, OptArgv[0], sizeof(gNetMapOverride));
             break;
-        case 55: // netretry
+        case 59: // netretry
             gNetRetry = true;
             break;
-        case 56: // clientport
+        case 60: // clientport
             gNetPortLocal = strtoul(OptArgv[0], NULL, 0);
             break;
         }
@@ -1877,11 +1883,6 @@ void ParseOptions(void)
         strcpy(gUserMapFilename, zFName);
     }
 #endif
-}
-
-void ClockStrobe()
-{
-    //gGameClock++;
 }
 
 #if defined(_WIN32) && defined(DEBUGGINGAIDS)
@@ -2022,6 +2023,8 @@ int app_main(int argc, char const * const * argv)
         }
         Bstrcpy(gSetup.lastini, pINISelected->zName);
     }
+    if (readSetup >= 0)
+        gSetup.firstlaunch = 0;
 #endif
 
 #if defined(_WIN32)
@@ -2138,7 +2141,6 @@ int app_main(int argc, char const * const * argv)
     LOG_F(INFO, "Loading control setup");
     ctrlInit();
     timerInit(CLOCKTICKSPERSECOND);
-    timerSetCallback(ClockStrobe);
     enginecompatibilitymode = ENGINE_19960925;
 
     if (!hasSetupFilename)
@@ -2245,6 +2247,8 @@ RESTART:
         gGameMenuMgr.Push(&menuMain, -1);
         if (gGameOptions.nGameType != kGameTypeSinglePlayer)
             gGameMenuMgr.Push(&menuNetStart, 1);
+        else if (gSetup.firstlaunch)
+            gGameMenuMgr.Push(&menuFirstLaunch, -1);
     }
     ready2send = 1;
     static bool frameJustDrawn;
@@ -2375,10 +2379,6 @@ RESTART:
                             bQuickNetStart = false;
                         }
                     }
-                    if (gGameMenuMgr.pActiveMenu == &menuNetworkBrowser) // search for servers
-                        netIRCProcess();
-                    else // exited server browser, gracefully disconnect from master list
-                        netIRCDeinitialize();
                 }
                 break;
             case INPUT_MODE_2:
@@ -3191,9 +3191,6 @@ void LoadExtraArts(void)
     }
 }
 
-static char bVanilla = 0;
-static char bDemoState = 0;
-
 void VanillaModeUpdate(void)
 {
     const bool bSinglePlayer = (gGameOptions.nGameType == kGameTypeSinglePlayer) && (numplayers == 1);
@@ -3205,15 +3202,6 @@ void VanillaModeUpdate(void)
         bVanilla = bSinglePlayer ? 2 : 0;
     else  // fallback on single-player global vanilla mode settings
         bVanilla = bDemoState || (gVanilla && bSinglePlayer);
-}
-
-bool VanillaMode(const bool bDemoCheck)
-{
-    if (bVanilla == 2) // vanilla mode override
-        return true;
-    if (bDemoCheck) // only check if demo recording/playing is active
-        return bDemoState;
-    return bVanilla; // fallback on global vanilla mode settings
 }
 
 bool WeaponsNotBlood(void) {

@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "blood.h"
 #include "db.h"
 #include "dude.h"
+#include "endgame.h"
 #include "eventq.h"
 #include "levels.h"
 #include "player.h"
@@ -128,6 +129,12 @@ static void TommySeqCallback(int, int nXSprite)
         actFireVector(pSprite, 0, 0, dx, dy, dz, kVectorBullet);
     else // projectile
         actFireMissile(pSprite, 0, 0, dx, dy, dz, kMissileBullet);
+#ifdef NOONE_EXTENSIONS
+    if (!gModernMap && EnemiesNotBlood() && !VanillaMode())
+#else
+    if (EnemiesNotBlood() && !VanillaMode())
+#endif
+        fxSpawnEjectingBrass(pSprite, pSprite->z, 25, 35);
     sfxPlay3DSound(pSprite, 4001, -1, 0);
 }
 
@@ -187,6 +194,12 @@ static void ShotSeqCallback(int, int nXSprite)
         else // projectile
             actFireMissile(pSprite, 0, 0, dx+r3, dy+r2, dz+r1, kMissileShell);
     }
+#ifdef NOONE_EXTENSIONS
+    if (!gModernMap && EnemiesNotBlood() && !VanillaMode())
+#else
+    if (EnemiesNotBlood() && !VanillaMode())
+#endif
+        fxSpawnEjectingShell(pSprite, pSprite->z, 25, 35);
     if (Chance(0x8000))
         sfxPlay3DSound(pSprite, 1001, -1, 0);
     else
@@ -209,16 +222,41 @@ static void ThrowSeqCallback(int, int nXSprite)
     {
         if (!Random(20))
             nMissile = kThingNapalmBall;
-        else if(!Random(15))
+        else if (!Random(15))
             nMissile = kThingArmedSpray;
-        else if(!Random(5))
+        else if (!Random(5))
             nMissile = kThingArmedProxBomb;
-        else if(!Random(25))
+        else if (!Random(25))
             nMissile = kThingZombieHead;
-        else if(!Random(10))
+        else if (!Random(10))
             nMissile = kThingPodFireBall;
-        else if(!Random(15))
+        else if (!Random(15))
             nMissile = kThingPodGreenBall;
+        else if (!Random(35))
+        {
+            spritetype *pSpawn = actSpawnDude(pSprite, pSprite->type, pSprite->clipdist<<1, 0);
+            if (pSpawn)
+            {
+                gKillMgr.AddCount(pSpawn);
+                pSpawn->ang = pSprite->ang;
+                nSprite = pSprite->index;
+                int x = Cos(pSprite->ang)>>16;
+                int y = Sin(pSprite->ang)>>16;
+                xvel[pSpawn->index] = xvel[nSprite] + mulscale14(0x155555<<1, x);
+                yvel[pSpawn->index] = yvel[nSprite] + mulscale14(0x155555<<1, y);
+                zvel[pSpawn->index] = -1500000;
+                return;
+            }
+        }
+        else if (!Random(35)) // throw self forward
+        {
+            int x = Cos(pSprite->ang)>>16;
+            int y = Sin(pSprite->ang)>>16;
+            xvel[nSprite] = xvel[nSprite] + mulscale14(0x155555<<1, x);
+            yvel[nSprite] = yvel[nSprite] + mulscale14(0x155555<<1, y);
+            zvel[nSprite] = -1250000;
+            return;
+        }
     }
     char v4 = Chance(0x6000);
     sfxPlay3DSound(pSprite, 455, -1, 0);

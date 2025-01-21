@@ -72,17 +72,24 @@ extern int gCacheMiss;
 extern int gDoQuickSave;
 extern int gMenuPicnum;
 
+extern char bVanilla;
+extern char bDemoState;
+
 extern bool gNetRetry;
 
 extern int gMultiModeInit;
 extern int gMultiLength;
 extern int gMultiLimit;
+extern bool gMultiModeNoExit;
+extern bool gMultiModeNoFlag;
 extern int gMultiEpisodeInit;
 extern int gMultiLevelInit;
 extern int gMultiDiffInit;
 extern int gMultiMonsters;
 extern int gMultiWeapons;
 extern int gMultiItems;
+extern int gMultiSpawnLocation;
+extern int gMultiSpawnProtection;
 
 void QuitGame(void);
 void PreloadCache(void);
@@ -92,7 +99,12 @@ void ScanINIFiles(void);
 bool LoadArtFile(const char *pzFile);
 void LoadExtraArts(void);
 void VanillaModeUpdate(void);
-bool VanillaMode(const bool bDemoCheck = false);
+inline bool VanillaMode(const bool bDemoCheck = false)
+{
+    if (bDemoCheck) // only check if demo recording/playing is active (or if vanilla mode is set to DOS mode)
+        return (bVanilla == 2) || bDemoState;
+    return bVanilla; // fallback on global vanilla mode settings
+}
 bool WeaponsNotBlood(void);
 bool WeaponsV10x(void);
 bool ProjectilesNotBlood(void);

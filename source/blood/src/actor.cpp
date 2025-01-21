@@ -1688,8 +1688,8 @@ MissileType missileInfo[] = {
         30458, // use bullet sprite from notblood.pk3/TILES099.ART
         (625)<<12,
         0,
-        32,
-        32,
+        14,
+        14,
         (char)-128,
         8,
     },
@@ -1698,8 +1698,8 @@ MissileType missileInfo[] = {
         30458, // use bullet sprite from notblood.pk3/TILES099.ART
         (625)<<12,
         0,
-        32,
-        32,
+        14,
+        14,
         (char)-128,
         8,
     }
@@ -2570,6 +2570,10 @@ void actInit(bool bSaveLoad) {
         }
     }
     
+    const char bHalfMotherSpiderHp = gGameOptions.uSpriteBannedFlags&BANNED_MSPIDERS_HP && !(!Bstrcmp(BloodIniFile, "BLOOD.INI") && (gGameOptions.nEpisode == 1 && gGameOptions.nLevel == 7)); // do not lower HP for E2M8
+    const char bMaxTchernobogHp = gGameOptions.uSpriteBannedFlags&BANNED_TCHERNOBOG_HP; // max tchernobog HP
+    dudeInfo[kDudeSpiderMother-kDudeBase].startHealth = bHalfMotherSpiderHp ? 50 : 100;
+    dudeInfo[kDudeTchernobog-kDudeBase].startHealth = bMaxTchernobogHp ? 255 : 32;
     if (gGameOptions.nMonsterSettings == 0)
     {
         gKillMgr.SetCount(0);
@@ -2900,11 +2904,6 @@ spritetype *actDropItem(spritetype *pSprite, int nType)
         pSprite2->shade = pItem->shade;
         pSprite2->xrepeat = pItem->xrepeat;
         pSprite2->yrepeat = pItem->yrepeat;
-        if (gGameOptions.bQuadDamagePowerup && (nType == kItemTwoGuns) && !VanillaMode()) // if quad damage is enabled
-        {
-            if (pSprite2->picnum == gPowerUpInfo[kPwUpTwoGuns].picnum) // replace guns akimbo icon with quad damage icon from notblood.pk3/TILES099.ART
-                pSprite2->picnum = 30463;
-        }
     }
     return pSprite2;
 }
@@ -3190,7 +3189,10 @@ void actKillDude(int nKillerSprite, spritetype *pSprite, DAMAGE_TYPE damageType,
     case kDudeCultistShotgun:
     case kDudeCultistTesla:
     case kDudeCultistTNT:
-        sfxPlay3DSound(pSprite, 1018+Random(2), -1, 0);
+        if (EnemiesNBlood() && !VanillaMode()) // trigger cultist death scream sfx over cultist alerts sfx channel
+            sfxPlay3DSound(pSprite, 1018+Random(2), kMaxSprites+pSprite->index, 1|8); // cultist alert sfx use kMaxSprites+sprite index as channel
+        else
+            sfxPlay3DSound(pSprite, 1018+Random(2), -1, 0);
         if (nSeq == 3)
             seqSpawn(dudeInfo[nType].seqStartID+nSeq, 3, nXSprite, nDudeToGibClient2);
         else
@@ -4647,6 +4649,17 @@ void MoveDude(spritetype *pSprite)
     int nAiStateType = (pXSprite->aiState) ? pXSprite->aiState->stateType : -1;
 
     dassert(nSector >= 0 && nSector < kMaxSectors);
+    if (pPlayer && gFlyMode)
+    {
+        static int nSpeed = 0;
+        const char nShift = gSonicMode && !VanillaMode() ? 2 : 3;
+        nSpeed = !pPlayer->input.buttonFlags.crouch && !pPlayer->input.buttonFlags.jump ? 0 : ClipHigh(nSpeed+(pPlayer->input.buttonFlags.crouch ? 0x1553>>1 : 0x1553), 0x5b05);
+
+        if (pPlayer->input.buttonFlags.jump)
+            pSprite->z -= nSpeed>>nShift;
+        if (pPlayer->input.buttonFlags.crouch)
+            pSprite->z += nSpeed>>nShift;
+    }
     if (xvel[nSprite] || yvel[nSprite])
     {
         int vx = xvel[nSprite];
@@ -4658,7 +4671,7 @@ void MoveDude(spritetype *pSprite)
         }
         vx >>= 12;
         vy >>= 12;
-        if (gSonicMode && pPlayer && !VanillaMode()) // if sonic mode cheat is active
+        if (pPlayer && gSonicMode && !VanillaMode()) // if sonic mode cheat is active
         {
             vx <<= 1; // double player velocity
             vy <<= 1;
@@ -4799,7 +4812,19 @@ void MoveDude(spritetype *pSprite)
         bDepth = 1;
     if (pPlayer)
         wd += 16;
-    if (zvel[nSprite])
+    if (pPlayer && gFlyMode)
+    {
+        pPlayer->underwaterTime = 1200;
+        pPlayer->chokeEffect = 0;
+        pSprite->flags |= 2;
+        if (!bUnderwater)
+        {
+            xvel[nSprite] -= mulscale16r(xvel[nSprite], 3696)<<1;
+            yvel[nSprite] -= mulscale16r(yvel[nSprite], 3696)<<1;
+        }
+        bUnderwater = 1;
+    }
+    else if (zvel[nSprite])
         pSprite->z += zvel[nSprite]>>8;
     int ceilZ, ceilHit, floorZ, floorHit;
     GetZRange(pSprite, &ceilZ, &ceilHit, &floorZ, &floorHit, wd, CLIPMASK0, PARALLAXCLIP_CEILING|PARALLAXCLIP_FLOOR);
@@ -4983,7 +5008,6 @@ void MoveDude(spritetype *pSprite)
                     evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
                     sfxPlay3DSound(pSprite, 720, -1, 0);
                     aiNewState(pSprite, pXSprite, &gillBeastSwimGoto);
-
                     pSprite->flags &= ~6;
                     break;
                 case kDudeGargoyleFlesh:
@@ -5028,77 +5052,6 @@ void MoveDude(spritetype *pSprite)
             }
             break;
         }
-        /*case 13:
-            pXSprite->medium = kMediumGoo;
-            if (pPlayer)
-            {
-                pPlayer->changeTargetKin = 1;
-                pXSprite->burnTime = 0;
-                pPlayer->bubbleTime = klabs(zvel[nSprite])>>12;
-                evPost(nSprite, 3, 0, kCallbackPlayerBubble);
-                sfxPlay3DSound(pSprite, 720, -1, 0);
-            }
-            else
-            {
-                switch (pSprite->type)
-                {
-                case kDudeCultistTommy:
-                case kDudeCultistShotgun:
-                    pXSprite->burnTime = 0;
-                    evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                    sfxPlay3DSound(pSprite, 720, -1, 0);
-                    aiNewState(pSprite, pXSprite, &cultistSwimGoto);
-                    break;
-                case kDudeBurningCultist:
-                    if (Chance(0x400))
-                    {
-                        pSprite->type = kDudeCultistTommy;
-                        pXSprite->burnTime = 0;
-                        evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                        sfxPlay3DSound(pSprite, 720, -1, 0);
-                        aiNewState(pSprite, pXSprite, &cultistSwimGoto);
-                    }
-                    else
-                    {
-                        pSprite->type = kDudeCultistShotgun;
-                        pXSprite->burnTime = 0;
-                        evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                        sfxPlay3DSound(pSprite, 720, -1, 0);
-                        aiNewState(pSprite, pXSprite, &cultistSwimGoto);
-                    }
-                    break;
-                case kDudeZombieAxeNormal:
-                    pXSprite->burnTime = 0;
-                    evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                    sfxPlay3DSound(pSprite, 720, -1, 0);
-                    aiNewState(pSprite, pXSprite, &zombieAGoto);
-                    break;
-                case kDudeZombieButcher:
-                    pXSprite->burnTime = 0;
-                    evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                    sfxPlay3DSound(pSprite, 720, -1, 0);
-                    aiNewState(pSprite, pXSprite, &zombieFGoto);
-                    break;
-                case kDudeGillBeast:
-                    pXSprite->burnTime = 0;
-                    evPost(nSprite, 3, 0, kCallbackEnemeyBubble);
-                    sfxPlay3DSound(pSprite, 720, -1, 0);
-                    aiNewState(pSprite, pXSprite, &gillBeastSwimGoto);
-                    pSprite->flags &= ~6;
-                    break;
-                case kDudeGargoyleFlesh:
-                case kDudeHellHound:
-                case kDudeSpiderBrown:
-                case kDudeSpiderRed:
-                case kDudeSpiderBlack:
-                case kDudeBat:
-                case kDudeRat:
-                case kDudeBurningInnocent:
-                    actKillDude(pSprite->index, pSprite, kDamageFall, 1000<<4);
-                    break;
-                }
-            }
-            break;*/
         }
     }
     GetSpriteExtents(pSprite, &top, &bottom);
@@ -5193,6 +5146,12 @@ void MoveDude(spritetype *pSprite)
     GetSpriteExtents(pSprite,&top,&bottom);
 
     pXSprite->height = ClipLow(floorZ-bottom, 0)>>8;
+    if (pPlayer && gFlyMode)
+    {
+        if ((xvel[nSprite] || yvel[nSprite]) && (approxDist(xvel[nSprite], yvel[nSprite]) < 0x1000))
+            xvel[nSprite] = yvel[nSprite] = 0;
+        return;
+    }
     if (xvel[nSprite] || yvel[nSprite])
     {
         if ((floorHit & 0xc000) == 0xc000)
@@ -5748,7 +5707,6 @@ void MoveMissileBullet(spritetype *pSprite)
             pOwner = NULL;
     }
     const bool underwaterSector = (sector[pSprite->sectnum].extra >= 0 && xsector[sector[pSprite->sectnum].extra].Underwater);
-    const bool bulletIsUnderwater = underwaterSector && (gGameOptions.nDifficulty < 4); // bullet is underwater and difficulty isn't extra crispy
     const int nSprite = pSprite->index;
     const int bakX = pSprite->x;
     const int bakY = pSprite->y;
@@ -5762,8 +5720,8 @@ void MoveMissileBullet(spritetype *pSprite)
         speed = (speed>>1) + (speed>>2);
     else if (gGameOptions.nHitscanProjectiles == 3) // if hitscan projectile speed is 125%, adjust hitscan range
         speed += (speed>>2);
-    if (bulletIsUnderwater) // if bullet is underwater, adjust hitscan range by 75%
-        speed = (speed>>1) + (speed>>2);
+    if (underwaterSector) // if bullet is underwater, adjust hitscan range by 50%
+        speed >>= 1;
     bool weHitSomething = MoveMissileBulletVectorTest(pSprite, pOwner, 0, 0, dx, dy, dz, nType, (speed>>12) + (speed>>13));
     while (!weHitSomething) // move missile and test for ceiling/floor
     {
@@ -5771,11 +5729,11 @@ void MoveMissileBullet(spritetype *pSprite)
         int vy = yvel[nSprite]>>12;
         int vz = zvel[nSprite]>>8;
         int nSector = pSprite->sectnum;
-        if (bulletIsUnderwater) // if bullet is underwater, slow down by 75%
+        if (underwaterSector) // if bullet is underwater, slow down by 50%
         {
-            vx = (vx>>1) + (vx>>2);
-            vy = (vy>>1) + (vy>>2);
-            vz = (vz>>1) + (vz>>2);
+            vx >>= 1;
+            vy >>= 1;
+            vz >>= 1;
         }
         pSprite->x += vx;
         pSprite->y += vy;
@@ -6630,7 +6588,7 @@ void actProcessSprites(void)
                 {
                     const char bDivingSuit = packItemActive(pPlayer, kPackDivingSuit);
                     if (bDivingSuit || pPlayer->godMode)
-                        pPlayer->underwaterTime = 1200;
+                        pPlayer->underwaterTime = kTicRate*10;
                     else
                         pPlayer->underwaterTime = ClipLow(pPlayer->underwaterTime-kTicsPerFrame, 0);
                     if (pPlayer->underwaterTime < 1080 && packCheckItem(pPlayer, kPackDivingSuit) && !bDivingSuit && (((pPlayer->pXSprite->health > 0) && gAutoDivingSuit) || VanillaMode())) // don't activate diving suit if player is dead
@@ -6782,7 +6740,6 @@ spritetype * actSpawnSprite(spritetype *pSource, int nStat);
 
 spritetype *actSpawnDude(spritetype *pSource, short nType, int a3, int a4)
 {
-    XSPRITE* pXSource = &xsprite[pSource->extra];
     spritetype *pSprite2 = actSpawnSprite(pSource, kStatDude);
     if (!pSprite2) return NULL;
     XSPRITE *pXSprite2 = &xsprite[pSprite2->extra];
@@ -6818,6 +6775,7 @@ spritetype *actSpawnDude(spritetype *pSource, short nType, int a3, int a4)
     // add a way to inherit some values of spawner type 18 by dude.
     // This way designer can count enemies via switches and do many other interesting things.
     if (gModernMap && pSource->flags & kModernTypeFlag1) {
+        XSPRITE* pXSource = &xsprite[pSource->extra];
         switch (pSource->type) { // allow inheriting only for selected source types
             case kMarkerDudeSpawn:
                 //inherit pal?
@@ -7065,9 +7023,12 @@ spritetype* actFireMissile(spritetype *pSprite, int a2, int a3, int a4, int a5, 
     pMissile->cstat |= CSTAT_SPRITE_BLOCK;
     if ((nType == kMissileShell) || (nType == kMissileBullet)) // do not set collisions on for bullet projectiles (so bullets will not collide with each other)
     {
+        if (gProjectileOldSprite)
+        {
+            pMissile->picnum = 30451; // use old bullet sprite from notblood.pk3/TILES099.ART
+            pMissile->xrepeat = pMissile->yrepeat = 32;
+        }
         pMissile->cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
-        if (gTransparentHitscanProjectiles)
-            pMissile->cstat |= CSTAT_SPRITE_TRANSLUCENT;
         if (gGameOptions.nHitscanProjectiles == 1) // if hitscan projectile speed is 75%, adjust speed
         {
             xvel[nMissile] = (xvel[nMissile]>>1) + (xvel[nMissile]>>2);

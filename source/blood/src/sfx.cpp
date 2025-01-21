@@ -49,7 +49,6 @@ static int oldEarAng = gSoundEarAng;
 static int nEarAng = kAng15;
 
 int gSoundOcclusion = 0; // adjust 3D sound sources volume if they don't have clear line of sight to player
-int gSoundUnderwaterPitch = 0; // modify pitch when underwater
 
 BONKLE Bonkle[256];
 BONKLE *BonkleCache[256];
@@ -200,6 +199,18 @@ void Calc3DValues(BONKLE *pBonkle)
     lVol = Vol3d(angle - (gMe->pSprite->ang - nEarAngle), nVol);
     rVol = Vol3d(angle - (gMe->pSprite->ang + nEarAngle), nVol);
 
+    if (MIRRORMODE & 1)
+    {
+        int nTemp;
+        nTemp = lPhase;
+        lPhase = rPhase;
+        rPhase = nTemp;
+
+        nTemp = lVol;
+        lVol = rVol;
+        rVol = nTemp;
+    }
+
     if (!DopplerToggle)
     {
         lPitch = rPitch = ClipRange(pBonkle->pitch, 5000, 50000);
@@ -218,6 +229,13 @@ void Calc3DValues(BONKLE *pBonkle)
     rPitch = scale(pBonkle->pitch, dmulscale30r(cosVal, earVR.dx, sinVal, earVR.dy) + nSoundSpeed, nPitch);
     lPitch = ClipRange(lPitch, 5000, 50000);
     rPitch = ClipRange(rPitch, 5000, 50000);
+    if (MIRRORMODE & 1)
+    {
+        int nTemp;
+        nTemp = lPitch;
+        lPitch = rPitch;
+        rPitch = nTemp;
+    }
 }
 
 void sfxPlay3DSound(int x, int y, int z, int soundId, int nSector)
@@ -326,7 +344,7 @@ void sfxPlay3DSound(spritetype *pSprite, int soundId, int chanId, int nFlags)
                 return;
             pBonkle = BonkleCache[nBonkles++];
         }
-        pBonkle->pSndSpr = pSprite;
+        pBonkle->pSndSpr = !(nFlags & 8) ? pSprite : NULL;
         pBonkle->chanId = chanId;
     }
     else
@@ -442,7 +460,7 @@ void sfxPlay3DSoundCP(spritetype* pSprite, int soundId, int chanId, int nFlags, 
                 return;
             pBonkle = BonkleCache[nBonkles++];
         }
-        pBonkle->pSndSpr = pSprite;
+        pBonkle->pSndSpr = !(nFlags & 8) ? pSprite : NULL;
         pBonkle->chanId = chanId;
     }
     else
@@ -579,7 +597,7 @@ void sfxKillSpriteSounds(spritetype *pSprite)
     }
 }
 
-void sfxUpdateSpritePos(spritetype *pSprite, vec3_t *pOffsetPos)
+void sfxUpdateSpritePos(spritetype *pSprite, vec3_t const *pOldPos)
 {
     dassert(pSprite != NULL);
     for (int i = nBonkles - 1; i >= 0; i--) // update all attached sprite sfx to new position
@@ -590,13 +608,13 @@ void sfxUpdateSpritePos(spritetype *pSprite, vec3_t *pOffsetPos)
             pBonkle->curPos.x = pSprite->x;
             pBonkle->curPos.y = pSprite->y;
             pBonkle->curPos.z = pSprite->z;
-            if (pOffsetPos)
+            if (pOldPos)
             {
-                pBonkle->oldPos.x = pSprite->x+(pBonkle->oldPos.x-pOffsetPos->x);
-                pBonkle->oldPos.y = pSprite->y+(pBonkle->oldPos.y-pOffsetPos->y);
-                pBonkle->oldPos.z = pSprite->z+(pBonkle->oldPos.z-pOffsetPos->z);
+                pBonkle->oldPos.x = pSprite->x+(pBonkle->oldPos.x-pOldPos->x);
+                pBonkle->oldPos.y = pSprite->y+(pBonkle->oldPos.y-pOldPos->y);
+                pBonkle->oldPos.z = pSprite->z+(pBonkle->oldPos.z-pOldPos->z);
             }
-            else
+            else // no old position given, reset current velocity
             {
                 pBonkle->oldPos = pBonkle->curPos;
             }
@@ -609,7 +627,7 @@ void sfxUpdateSpritePos(spritetype *pSprite, vec3_t *pOffsetPos)
     }
 }
 
-void sfxUpdateListenerPos(void)
+inline void sfxUpdateListenerPos(void)
 {
     const int dx = mulscale30(Cos(gMe->pSprite->ang + kAng90), kEarDist>>1);
     const int dy = mulscale30(Sin(gMe->pSprite->ang + kAng90), kEarDist>>1);
@@ -619,7 +637,7 @@ void sfxUpdateListenerPos(void)
     earR = {gMe->pSprite->x + dx, gMe->pSprite->y + dy};
 }
 
-void sfxUpdateListenerVel(void)
+inline void sfxUpdateListenerVel(void)
 {
     earVL = {earL.x - earL0.x, earL.y - earL0.y};
     earVR = {earR.x - earR0.x, earR.y - earR0.y};
@@ -642,7 +660,7 @@ void sfxResetListener(void)
     earVL = earVR = {0, 0}; // reset ear velocity
 }
 
-static void sfxUpdateSpeedOfSound(void)
+void sfxUpdateSpeedOfSound(void)
 {
     if (gSoundSpeed != oldSoundSpeed) // if speed of sound setting has been changed, convert real world meters to build engine units
     {
@@ -651,7 +669,7 @@ static void sfxUpdateSpeedOfSound(void)
     }
 }
 
-static void sfxUpdateEarAng(void)
+void sfxUpdateEarAng(void)
 {
     if (gSoundEarAng != oldEarAng) // if ear angle setting has been changed, convert degrees to build engine degrees
     {
@@ -660,7 +678,7 @@ static void sfxUpdateEarAng(void)
     }
 }
 
-inline int ClampScale(int nVal, int nInMin, int nInMax, int nOutMin, int nOutMax)
+int ClampScale(int nVal, int nInMin, int nInMax, int nOutMin, int nOutMax)
 {
 	if (nInMin == nInMax)
 		return (nVal - nInMax) >= 0 ? nOutMax : nOutMin;
@@ -670,7 +688,7 @@ inline int ClampScale(int nVal, int nInMin, int nInMax, int nOutMin, int nOutMax
 	return nOutMin + int(float(nOutMax - nOutMin) * cVal);
 }
 
-static void sfxPlayerDamageFeedback(void)
+void sfxPlayerDamageFeedback(void)
 {
     const int kMinDam = 50, kMaxDam = 1500, kDelayTicks = 7;
     for (int i = 0; i < 4; i++)
@@ -692,14 +710,6 @@ static void sfxPlayerDamageFeedback(void)
     }
 }
 
-static void sfxModifyPitchUnderwater(spritetype *pSndSpr, int *nPitch)
-{
-    if (pSndSpr && (pSndSpr == gMe->pSprite)) // if sound is assigned to player sprite, don't modify pitch
-        return;
-    *nPitch -= (int)(((32<<4) * 25) / kTicsPerSec);
-    *nPitch = ClipRange(*nPitch, 5000, 50000);
-}
-
 void sfxUpdate3DSounds(void)
 {
     sfxUpdateListenerPos();
@@ -708,7 +718,6 @@ void sfxUpdate3DSounds(void)
     sfxUpdateEarAng();
     if (gSoundDing)
         sfxPlayerDamageFeedback();
-    const char bUnderwater = gSoundUnderwaterPitch && !VanillaMode() && gMe->pSprite && sectRangeIsFine(gMe->pSprite->sectnum) && IsUnderwaterSector(gMe->pSprite->sectnum); // if underwater, lower audio pitch
     for (int i = nBonkles - 1; i >= 0; i--)
     {
         BONKLE *pBonkle = BonkleCache[i];
@@ -728,8 +737,6 @@ void sfxUpdate3DSounds(void)
             {
                 if (pBonkle->rChan > 0)
                 {
-                    if (bUnderwater)
-                        sfxModifyPitchUnderwater(pBonkle->pSndSpr, &lPitch);
                     FX_SetPan(pBonkle->lChan, lVol, lVol, 0);
                     FX_SetFrequency(pBonkle->lChan, lPitch);
                 }
@@ -738,8 +745,6 @@ void sfxUpdate3DSounds(void)
             }
             if (pBonkle->rChan > 0)
             {
-                if (bUnderwater)
-                    sfxModifyPitchUnderwater(pBonkle->pSndSpr, &rPitch);
                 FX_SetPan(pBonkle->rChan, rVol, 0, rVol);
                 FX_SetFrequency(pBonkle->rChan, rPitch);
             }

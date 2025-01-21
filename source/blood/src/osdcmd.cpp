@@ -460,6 +460,20 @@ static int osdcmd_notarget(osdcmdptr_t UNUSED(parm))
     return OSDCMD_OK;
 }
 
+static int osdcmd_fly(osdcmdptr_t UNUSED(parm))
+{
+    UNREFERENCED_CONST_PARAMETER(parm);
+    if (numplayers == 1 && gGameStarted && !gDemo.bPlaying && !gDemo.bRecording)
+    {
+        SetFlyMode(!gFlyMode);
+        gCheatMgr.m_bPlayerCheated = true;
+    }
+    else
+        OSD_Printf("fly: Not in a single-player game.\n");
+
+    return OSDCMD_OK;
+}
+
 static int osdcmd_restartsound(osdcmdptr_t UNUSED(parm))
 {
     UNREFERENCED_CONST_PARAMETER(parm);
@@ -552,7 +566,7 @@ const char *const ConsoleButtons[] =
 
 static int osdcmd_bind(osdcmdptr_t parm)
 {
-    char buffer[256];
+    char buffer[2048];
     if (parm->numparms==1 && !Bstrcasecmp(parm->parms[0],"showkeys"))
     {
         for (auto & s : sctokeylut)
@@ -854,14 +868,6 @@ static int osdcmd_cvar_set_game(osdcmdptr_t parm)
             r_ambientlightrecip = 256.f;
         else r_ambientlightrecip = 1.f/r_ambientlight;
     }
-    else if (!Bstrcasecmp(parm->name, "in_mouse"))
-    {
-        CONTROL_MouseEnabled = (gSetup.usemouse && CONTROL_MousePresent);
-    }
-    else if (!Bstrcasecmp(parm->name, "in_joystick"))
-    {
-        CONTROL_JoystickEnabled = (gSetup.usejoystick && CONTROL_JoyPresent);
-    }
     else if (!Bstrcasecmp(parm->name, "vid_gamma"))
     {
         gBrightness = GAMMA_CALC;
@@ -969,8 +975,10 @@ int32_t registerosdcommands(void)
     static osdcvardata_t cvars_game[] =
     {
         { "crosshair", "enable/disable crosshair (0: off, 1: on, 2: on [autoaim])", (void *)&gAimReticle, CVAR_INT, 0, 2 },
+        { "crosshairoffsetx", "set X axis offset for crosshair (-32 to 32)", (void *)&gAimReticleOffsetX, CVAR_INT, -32, 32 },
+        { "crosshairoffsety", "set Y axis offset for crosshair (-32 to 32)", (void *)&gAimReticleOffsetY, CVAR_INT, -32, 32 },
 
-        { "cl_autoaim", "enable/disable weapon autoaim", (void *)&gAutoAim, CVAR_INT|CVAR_MULTI, 0, 3 },
+        { "cl_autoaim", "enable/disable weapon autoaim", (void *)&gAutoAim, CVAR_INT|CVAR_MULTI, 0, 4 },
 //        { "cl_automsg", "enable/disable automatically sending messages to all players", (void *)&ud.automsg, CVAR_BOOL, 0, 1 },
         { "cl_autodivingsuit", "enable/disable automatic diving suit equipping when entering water (always enabled in multiplayer)", (void *)&gAutoDivingSuit, CVAR_BOOL, 0, 1 },
         { "cl_autorun", "enable/disable autorun", (void *)&gAutoRun, CVAR_BOOL, 0, 1 },
@@ -1012,8 +1020,8 @@ int32_t registerosdcommands(void)
         { "cl_slowroomflicker", "enable/disable slowed flickering speed for sectors (such as E1M4's snake pit room)", (void *)&gSlowRoomFlicker, CVAR_BOOL, 0, 1 },
         { "cl_shadowsfake3d", "enable/disable 3d projection for fake sprite shadows", (void *)&gShadowsFake3D, CVAR_BOOL, 0, 1 },
         { "cl_smoketrail3d", "enable/disable 3d smoke trail positioning for tnt/spray can (single-player only)", (void *)&gSmokeTrail3D, CVAR_BOOL, 0, 1 },
-        { "cl_hitscantransparent", "enable/disable transparent bullet sprites for hitscan projectiles option", (void *)&gTransparentHitscanProjectiles, CVAR_BOOL, 0, 1 },
         { "cl_particlesduration", "enable/disable extended particle duration modification (single-player only - turned off for modern maps)", (void *)&gParticlesDuration, CVAR_BOOL, 0, 1 },
+        { "cl_projectileoldsprite", "enable/disable old pink sprite for hitscan projectiles", (void *)&gProjectileOldSprite, CVAR_BOOL, 0, 1 },
 
         { "cl_rollangle", "sets how much your screen tilts when strafing (polymost)", (void *)&gRollAngle, CVAR_INT, 0, 5 },
         { "cl_runmode", "enable/disable modernized run key operation", (void *)&gRunKeyMode, CVAR_BOOL, 0, 1 },
@@ -1092,9 +1100,6 @@ int32_t registerosdcommands(void)
         { "deliriumblur", "enable/disable delirium blur effect(polymost)", (void *)&gDeliriumBlur, CVAR_BOOL, 0, 1 },
         { "detail", "change the detail graphics setting (0-4)", (void *)&gDetail, CVAR_INT|CVAR_FUNCPTR, 0, 4 },
         { "fov", "change the field of view", (void *)&gFov, CVAR_INT|CVAR_FUNCPTR, 75, 140 },
-        { "in_joystick","enables input from the joystick if it is present",(void *)&gSetup.usejoystick, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
-        { "in_rumble","enables rumble for joystick if it is present",(void *)&gSetup.joystickrumble, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
-        { "in_mouse","enables input from the mouse if it is present",(void *)&gSetup.usemouse, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
 
         { "in_aimmode", "0: toggle, 1: hold to aim", (void *)&gMouseAiming, CVAR_BOOL, 0, 1 },
         { "in_centerviewondrop", "enable/disable recenter view when dropping down onto ground", (void *)&gCenterViewOnDrop, CVAR_BOOL, 0, 1 },
@@ -1106,8 +1111,9 @@ int32_t registerosdcommands(void)
         { "in_mousedeadzone", "amount of mouse movement to filter out", (void *)&MouseDeadZone, CVAR_INT, 0, 512 },
         { "in_mouseflip", "invert vertical mouse movement", (void *)&gMouseAimingFlipped, CVAR_BOOL, 0, 1 },
         { "in_mousemode", "toggles vertical mouse view", (void *)&gMouseAim, CVAR_BOOL, 0, 1 },
-        { "in_turnsensitivity", "keyboard turning sensitivity multiplier", (void *)&gTurnSpeed, CVAR_INT, 64, 124 },
-        { "in_turnacceleration", "set keyboard turning acceleration (0: off, 1: only when running, 2: always on)", (void *)&gTurnAcceleration, CVAR_INT, 0, 2 },
+        { "in_targetaimassist", "enable/disable slowing camera movement when aiming towards a target (joystick only)", (void *)&gTargetAimAssist, CVAR_BOOL, 0, 1 },
+        { "in_turnaccelmode", "set keyboard turning acceleration mode (0: off, 1: only when running, 2: always on)", (void *)&gTurnAcceleration, CVAR_INT, 0, 2 },
+        { "in_turnspeed", "keyboard turning speed", (void *)&gTurnSpeed, CVAR_INT, 64, 124 },
 
 //
         { "model", "set player model for multiplayer (0: caleb, 1: cultist)", (void *)&gPlayerModel, CVAR_BOOL, 0, 1 },
@@ -1157,7 +1163,6 @@ int32_t registerosdcommands(void)
         { "snd_stereo", "enable/disable 3d stereo sound", (void *)&gStereo, CVAR_BOOL, 0, 1 },
         { "snd_fmpianofix", "enable/disable fm piano timbre fix", (void*)&gFMPianoFix, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
         { "snd_occlusion", "enable/disable lowering sound volume by 50% for occluded sound sources", (void *)&gSoundOcclusion, CVAR_BOOL, 0, 1 },
-        { "snd_underwaterpitch", "enable/disable lowering sound pitch by 7% while underwater", (void *)&gSoundUnderwaterPitch, CVAR_BOOL, 0, 1 },
 //        { "snd_speech", "enables/disables player speech", (void *)&ud.config.VoiceToggle, CVAR_INT, 0, 5 },
 //
 //        { "team","change team in multiplayer", (void *)&ud.team, CVAR_INT|CVAR_MULTI, 0, 3 },
@@ -1229,6 +1234,7 @@ int32_t registerosdcommands(void)
         OSD_RegisterFunction(t, Xstrdup(buffer), osdcmd_button);
     }
 
+    OSD_RegisterFunction("fly","fly: toggles fly mode", osdcmd_fly);
     OSD_RegisterFunction("give","give <all|health|weapons|ammo|armor|keys|inventory>: gives requested item", osdcmd_give);
     OSD_RegisterFunction("god","god: toggles god mode", osdcmd_god);
 //    OSD_RegisterFunction("activatecheat","activatecheat <id>: activates a cheat code", osdcmd_activatecheat);

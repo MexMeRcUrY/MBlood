@@ -370,7 +370,7 @@ void fakeProcessInput(PLAYER *pPlayer, GINPUT *pInput)
 
     predict.at70 = (gProfile[pPlayer->nPlayer].nWeaponHBobbing == 2) || VanillaMode() ? pInput->syncFlags.run : 0; // v1.0x weapon swaying (vanilla 1.21 multiplayer hardcoded this)
     predict.at71 = pInput->buttonFlags.jump;
-    if (predict.at48 == 1)
+    if (predict.at48 == 1 || gFlyMode)
     {
         int x = Cos(fix16_to_int(predict.at30));
         int y = Sin(fix16_to_int(predict.at30));
@@ -461,7 +461,7 @@ void fakeProcessInput(PLAYER *pPlayer, GINPUT *pInput)
             else predict.at64 = pPosture->normalJumpZ;//-0xbaaaa;
             predict.at6f = 1;
         }
-        if (pInput->buttonFlags.crouch)
+        if (pInput->buttonFlags.crouch && !gFlyMode)
             predict.at48 = 2;
         break;
     }
@@ -1373,6 +1373,59 @@ void viewDrawStats(PLAYER *pPlayer, int x, int y)
     }
 }
 
+#define kMaxBurnFlames 9
+
+const struct BURNTABLE {
+    short nTile;
+    unsigned char nStat;
+    unsigned char nPal;
+    int nScale;
+    short nX, nY;
+} gBurnTable[kMaxBurnFlames] = {
+    {2101, RS_AUTO, 0, 118784,  10, 220},
+    {2101, RS_AUTO, 0, 110592,  40, 220},
+    {2101, RS_AUTO, 0,  81920,  85, 220},
+    {2101, RS_AUTO, 0,  69632, 120, 220},
+    {2101, RS_AUTO, 0,  61440, 160, 220},
+    {2101, RS_AUTO, 0,  73728, 200, 220},
+    {2101, RS_AUTO, 0,  77824, 235, 220},
+    {2101, RS_AUTO, 0, 110592, 275, 220},
+    {2101, RS_AUTO, 0, 122880, 310, 220}
+};
+
+int gBurnTableAspectOffset[kMaxBurnFlames] = {0};
+
+void viewBurnTimeInit(void)
+{
+    if (!r_usenewaspect) return;
+
+    for (int i = 0; i < kMaxBurnFlames; i++)
+    {
+        int nX = gBurnTable[i].nX;
+        nX = scale(nX-(320>>1), 320>>1, 266>>1); // scale flame position
+        nX = scale(nX<<16, xscale, yscale); // multiply by window ratio
+        nX += (320>>1)<<16; // offset to center
+        gBurnTableAspectOffset[i] = nX;
+    }
+}
+
+void viewBurnTime(int gScale)
+{
+    if (!gScale) return;
+
+    for (int i = 0; i < kMaxBurnFlames; i++)
+    {
+        const BURNTABLE *pBurnTable = &gBurnTable[i];
+        const int nTile = gBurnTable[i].nTile+qanimateoffs(pBurnTable->nTile,32768+i);
+        int nScale = pBurnTable->nScale;
+        if (gScale < 600)
+            nScale = scale(nScale, gScale, 600);
+        const int nX = r_usenewaspect ? gBurnTableAspectOffset[i] : pBurnTable->nX<<16;
+        rotatesprite(nX, pBurnTable->nY<<16, nScale, 0, nTile,
+            0, pBurnTable->nPal, pBurnTable->nStat, windowxy1.x, windowxy1.y, windowxy2.x, windowxy2.y);
+    }
+}
+
 #define kPowerUps 12
 
 const struct POWERUPDISPLAY {
@@ -1912,14 +1965,14 @@ void viewDrawKillMsg(ClockTicks arg)
     char buffer[128] = "";
     if (bShowVictimMsg)
     {
-        nPal = gColorMsg ? playerColorPalMessage(gPlayer[gPlayerLastKiller].teamId) : 0;
+        nPal = playerColorPalMessage(gPlayer[gPlayerLastKiller].teamId);
         sprintf(buffer, "Killed by %s", gProfile[gPlayerLastKiller].name);
         COLORSTR colorStr = {nPal, 0, {10, 127}, {-1, -1}};
         viewDrawText(0, buffer, 160, 137, -128, 0, 1, 1, 0, 0, &colorStr);
     }
     else if (bShowKillerMsg)
     {
-        nPal = gColorMsg ? playerColorPalMessage(gPlayer[gPlayerLastVictim].teamId) : 0;
+        nPal = playerColorPalMessage(gPlayer[gPlayerLastVictim].teamId);
         sprintf(buffer, "Killed %s", gProfile[gPlayerLastVictim].name);
         COLORSTR colorStr = {nPal, 0, {7, 127}, {-1, -1}};
         viewDrawText(0, buffer, 160, 137, -128, 0, 1, 1, 0, 0, &colorStr);
@@ -1945,7 +1998,7 @@ void viewDrawMultiKill(ClockTicks arg)
     const char bShowMultiKill = (gFrameClock - gMultiKillsTicks[gMe->nPlayer]) < (int)(kTicRate * 1.5); // show multi kill message for 1.5 seconds
     if (bShowMultiKill)
     {
-        const int nPalette = gColorMsg ? playerColorPalMultiKill(gMe->teamId) : 0;
+        const int nPalette = playerColorPalMultiKill(gMe->teamId);
         if ((int)totalclock & 16) // flash multi kill message
             return;
         switch (gMultiKillsFrags[gMe->nPlayer])
@@ -1969,7 +2022,7 @@ void viewDrawMultiKill(ClockTicks arg)
     }
     else if ((gAnnounceKillingSpreeTicks > 0) && (gAnnounceKillingSpreePlayer < kMaxPlayers)) // announce player's kill streak
     {
-        const int nPalette = gColorMsg ? playerColorPalMultiKill(gPlayer[gAnnounceKillingSpreePlayer].teamId) : 0;
+        const int nPalette = playerColorPalMultiKill(gPlayer[gAnnounceKillingSpreePlayer].teamId);
         char buffer[128] = "";
         switch (gMultiKillsFrags[gAnnounceKillingSpreePlayer])
         {
@@ -2050,17 +2103,10 @@ void viewDrawWinner(const char *pString, int nPal)
             }
         }
 
-        if (gColorMsg)
-        {
-            if ((nColorPart != 2) && (nColorPart != 4)) // something went very wrong, don't color message
-                nColorOffsets[0] = nColorOffsets[1] = nColorOffsets[2] = nColorOffsets[3] = -1;
+        if ((nColorPart != 2) && (nColorPart != 4)) // something went very wrong, don't color message
+            nColorOffsets[0] = nColorOffsets[1] = nColorOffsets[2] = nColorOffsets[3] = -1;
 
-            colorStr = {nPal, 0, {nColorOffsets[0], nColorOffsets[1]}, {nColorOffsets[2], nColorOffsets[3]}}; // set info for coloring sub-strings within string
-        }
-        else // no colors
-        {
-            Bmemset((void *)&colorStr, 0, sizeof(colorStr));
-        }
+        colorStr = {nPal, 0, {nColorOffsets[0], nColorOffsets[1]}, {nColorOffsets[2], nColorOffsets[3]}}; // set info for coloring sub-strings within string
     }
 
     if (!gPlayerRoundEnding)
@@ -2413,6 +2459,9 @@ void viewPrecacheTiles(void)
         tilePrecacheTile(2220 + i, 0);
         tilePrecacheTile(2552 + i, 0);
     }
+    // pre-cache all notblood.pk3/TILES099.ART
+    for (int i = 30451; i <= 30463; i++)
+        tilePrecacheTile(i, 0);
 }
 
 int *lensTable;
@@ -2502,7 +2551,7 @@ void viewUpdateHudRatio(void)
     if (gPowerupDuration > 1)
         xscalepowerups = viewCalculateOffetRatio(gPowerupDuration-2);
 
-    gPlayerMsg.xoffset = gGameMessageMgr.xoffset = gViewMap.xoffset = (gViewSize < 6) ? xscalehud : 0;
+    gPlayerMsg.xoffset = gGameMessageMgr.xoffset = gViewMap.xoffset = (gViewMode == 3 && gViewSize < 6) ? xscalehud : 0;
 
     if (gPowerupDuration)
         xscalectfhud = xscalepowerups;
@@ -2517,14 +2566,19 @@ void viewUpdateSkyRatio(void)
     psky_t *pSky = tileSetupSky(0);
     if (!pSky)
         return;
-    if (gFov >= 90)
-        pSky->yscale = divscale16(mulscale16(fix16_from_float(1), fix16_from_float(float(gFov)/90.f)), yxaspect);
+    if (gFov > 75) // using a math curve, calculate the scale using the FOV
+    {
+        pSky->yscale = divscale16(fix16_from_int(gFov * gFov), fix16_from_float(1.f / 0.000177989f));
+        pSky->yscale -= divscale16(fix16_from_int(gFov), fix16_from_float(1.f / 0.0241556f));
+        pSky->yscale += fix16_from_float(1.81923f);
+    }
     else
         pSky->yscale = 65536;
 }
 
 void viewResizeView(int size)
 {
+    const char bDrawFragsBg = (gGameOptions.nGameType != kGameTypeSinglePlayer) && (!VanillaMode() || gGameOptions.nGameType != kGameTypeTeams);
     int xdimcorrect = ClipHigh(scale(ydim, 4, 3), xdim);
     gViewXCenter = xdim-xdim/2;
     gViewYCenter = ydim-ydim/2;
@@ -2540,7 +2594,7 @@ void viewResizeView(int size)
         gViewX1 = xdim-1;
         gViewY0 = 0;
         gViewY1 = ydim-1;
-        if (gGameOptions.nGameType != kGameTypeSinglePlayer)
+        if (bDrawFragsBg)
         {
             gViewY0 = (tilesiz[2229].y*ydim*((gNetPlayers+3)/4))/200;
         }
@@ -2555,7 +2609,7 @@ void viewResizeView(int size)
         gViewY0 = 0;
         gViewX1 = xdim-1;
         gViewY1 = ydim-1-(25*ydim)/200;
-        if (gGameOptions.nGameType != kGameTypeSinglePlayer)
+        if (bDrawFragsBg)
         {
             gViewY0 = (tilesiz[2229].y*ydim*((gNetPlayers+3)/4))/200;
         }
@@ -2571,17 +2625,25 @@ void viewResizeView(int size)
         gViewY1S = divscale16(gViewY1, yscale);
     }
     videoSetViewableArea(gViewX0, gViewY0, gViewX1, gViewY1);
-    if ((gGameOptions.nGameType == kGameTypeTeams) && VanillaMode()) // lower text for vanilla CTF hud (v1.21 did not do this btw)
+    if (gViewMode == 4) // 2D map view
     {
-        gGameMessageMgr.SetCoordinates(gViewX0S+1, gViewY0S+15);
+        int nOffset = bDrawFragsBg && !VanillaMode() ? (tilesiz[2229].y*ydim*((gNetPlayers+3)/4))/200 : 0;
+        nOffset = divscale16(nOffset, yscale);
+        nOffset += gGameOptions.nGameType == kGameTypeSinglePlayer && !VanillaMode() ? 6 : 1;
+        gGameMessageMgr.SetCoordinates(1, nOffset);
     }
     else
     {
-        const int nOffset = !VanillaMode() && (gGameOptions.nGameType == kGameTypeSinglePlayer) && (gViewSize < 6) ? 6 : 1; // lower message position for single-player
-        gGameMessageMgr.SetCoordinates(gViewX0S+1, gViewY0S+nOffset);
+        int nOffset = 1;
+        if ((gGameOptions.nGameType == kGameTypeTeams) && VanillaMode()) // lower text for vanilla CTF hud (v1.21 did not do this)
+            nOffset = 15;
+        else if ((gGameOptions.nGameType == kGameTypeSinglePlayer) && (gViewSize < 6) && !VanillaMode()) // lower message position for single-player
+            nOffset = 6;
+        gGameMessageMgr.SetCoordinates(gViewX0S + 1, gViewY0S + nOffset);
     }
     gGameMessageMgr.maxNumberOfMessagesToDisplay = !VanillaMode() && (gGameOptions.nGameType != kGameTypeSinglePlayer) ? 3 : 4; // set max displayed messages to 3 for multiplayer (reduces on screen clutter)
     viewSetCrosshairColor(CrosshairColors.r, CrosshairColors.g, CrosshairColors.b);
+    viewBurnTimeInit();
     viewSetRenderScale(0);
     viewUpdateHudRatio();
     viewUpdateSkyRatio();
@@ -2716,33 +2778,50 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
         int top, bottom;
         GetSpriteExtents(pTSprite, &top, &bottom);
 
-        auto pNSprite = viewInsertTSprite(pTSprite->sectnum, 32767, pTSprite);
-        auto pNSprite2 = viewInsertTSprite(pTSprite->sectnum, 32766, pTSprite);
-        if (!pNSprite || !pNSprite2)
-            break;
-        pNSprite->cstat |= CSTAT_SPRITE_TRANSLUCENT_INVERT | CSTAT_SPRITE_TRANSLUCENT;
+        if (videoGetRenderMode() != REND_CLASSIC) {
+            
+            auto pNSprite2 = viewInsertTSprite(pTSprite->sectnum, 32767, pTSprite);
+            if (!pNSprite2)
+                break;
 
-        pNSprite->picnum = 2229;
-        pNSprite2->picnum = 2203;
+            pNSprite2->picnum = 2203;
 
-        pNSprite->xoffset = -1;
-        pNSprite->xrepeat = 40;
-        pNSprite->yrepeat = 64;
-        pNSprite->pal = 5;
+            pNSprite2->xrepeat = width;
+            pNSprite2->yrepeat = 20;
+            pNSprite2->pal = 10;
+            if (perc >= 75) pNSprite2->pal = 0;
+            else if (perc >= 50) pNSprite2->pal = 6;
+            
+            pNSprite2->z = top - 2048;
+            pNSprite2->shade = -128;
 
-        pNSprite2->xrepeat = width;
-        pNSprite2->yrepeat = 34;
-        pNSprite2->pal = 10;
-        if (perc >= 75) pNSprite2->pal = 0;
-        else if (perc >= 50) pNSprite2->pal = 6;
 
-        pNSprite->z = pNSprite2->z = top - 2048;
-        pNSprite->shade = pNSprite2->shade = -128;
+        } else {
+            
 
-        if (videoGetRenderMode() != REND_CLASSIC) { // move border sprite back a touch so it doesn't z-fight with bar
-            pNSprite->x += mulscale30(4, Cos(gCameraAng));
-            pNSprite->y += mulscale30(4, Sin(gCameraAng));
-            pNSprite->z -= 3<<5; // align so from ground level the bar looks correct
+            auto pNSprite = viewInsertTSprite(pTSprite->sectnum, 32767, pTSprite);
+            auto pNSprite2 = viewInsertTSprite(pTSprite->sectnum, 32766, pTSprite);
+            if (!pNSprite || !pNSprite2)
+                break;
+            pNSprite->cstat |= CSTAT_SPRITE_TRANSLUCENT_INVERT | CSTAT_SPRITE_TRANSLUCENT;
+
+            pNSprite->picnum = 2229;
+            pNSprite2->picnum = 2203;
+
+            pNSprite->xoffset = -1;
+            pNSprite->xrepeat = 40;
+            pNSprite->yrepeat = 64;
+            pNSprite->pal = 5;
+
+            pNSprite2->xrepeat = width;
+            pNSprite2->yrepeat = 34;
+            pNSprite2->pal = 10;
+            if (perc >= 75) pNSprite2->pal = 0;
+            else if (perc >= 50) pNSprite2->pal = 6;
+
+            pNSprite->z = pNSprite2->z = top - 2048;
+            pNSprite->shade = pNSprite2->shade = -128;
+
         }
         break;
     }
@@ -2957,14 +3036,26 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
         if (!pNSprite)
             break;
         pNSprite->z = getflorzofslope(pTSprite->sectnum, pNSprite->x, pNSprite->y);
-        if (gGameOptions.bSectorBehavior && !VanillaMode()) // support better floor detection for shadows (detect fake floors/allows ROR traversal)
+        if (!VanillaMode()) // support better floor detection for shadows (detect fake floors/allows ROR traversal)
         {
-            int ceilZ, ceilHit, floorZ, floorHit;
-            GetZRangeAtXYZ(pTSprite->x, pTSprite->y, pTSprite->z, pTSprite->sectnum, &ceilZ, &ceilHit, &floorZ, &floorHit, pTSprite->clipdist<<2, CLIPMASK0, PARALLAXCLIP_CEILING|PARALLAXCLIP_FLOOR);
-            if (((floorHit&0xc000) == 0xc000) && spriRangeIsFine(floorHit&0x3fff) && ((sprite[floorHit&0x3fff].cstat & (CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_ALIGNMENT_FLOOR|CSTAT_SPRITE_INVISIBLE)) == (CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_ALIGNMENT_FLOOR))) // if there is a fake floor under us, use fake floor as the shadow position
+            char bHitFakeFloor = 0;
+            short nFakeFloorSprite;
+            if (spriRangeIsFine(pTSprite->owner) && !gMirrorDrawing) // don't attempt to check for fake floors if we're rendering a mirror due to getzrange mirrorsector crash
+            {
+                spritetype *pSprite = &sprite[pTSprite->owner];
+                int bakCstat = pSprite->cstat;
+                pSprite->cstat &= ~257;
+                int ceilZ, ceilHit, floorZ, floorHit;
+                GetZRangeAtXYZ(pSprite->x, pSprite->y, pSprite->z, pSprite->sectnum, &ceilZ, &ceilHit, &floorZ, &floorHit, pSprite->clipdist<<2, CLIPMASK0, PARALLAXCLIP_CEILING|PARALLAXCLIP_FLOOR);
+                nFakeFloorSprite = floorHit&0x3fff;
+                if ((floorHit&0xc000) == 0xc000)
+                    bHitFakeFloor = (sprite[nFakeFloorSprite].cstat & (CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_ALIGNMENT_FLOOR|CSTAT_SPRITE_INVISIBLE)) == (CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_ALIGNMENT_FLOOR);
+                pSprite->cstat = bakCstat;
+            }
+            if (bHitFakeFloor) // if there is a fake floor under us, use fake floor as the shadow position
             {
                 int top, bottom;
-                GetSpriteExtents(&sprite[floorHit&0x3fff], &top, &bottom);
+                GetSpriteExtents(&sprite[nFakeFloorSprite], &top, &bottom);
                 pNSprite->z = top;
                 pNSprite->z--; // offset from fake floor so it isn't z-fighting when being rendered
             }
@@ -3027,7 +3118,7 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
     case kViewEffectCeilGlow:
     {
         sectortype *pSector = &sector[pTSprite->sectnum];
-        if (gGameOptions.bSectorBehavior && !VanillaMode()) // if ceiling has ror, don't render effect
+        if (!VanillaMode()) // if ceiling has ror, don't render effect
         {
             if ((pSector->ceilingpicnum >= 4080) && (pSector->ceilingpicnum <= 4095))
                 break;
@@ -3035,7 +3126,7 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
         auto pNSprite = viewInsertTSprite(pTSprite->sectnum, 32767, pTSprite);
         if (!pNSprite)
             break;
-        char bCalcSlope = gGameOptions.bSectorBehavior && !VanillaMode();
+        const char bCalcSlope = gGameOptions.bSectorBehavior && !VanillaMode();
         int zDiff = bCalcSlope ? getceilzofslope(pTSprite->sectnum, pTSprite->x, pTSprite->y) : pSector->ceilingz;
         pNSprite->x = pTSprite->x;
         pNSprite->y = pTSprite->y;
@@ -3061,7 +3152,7 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
     case kViewEffectFloorGlow:
     {
         sectortype *pSector = &sector[pTSprite->sectnum];
-        if (gGameOptions.bSectorBehavior && !VanillaMode()) // if floor has ror, don't render effect
+        if (!VanillaMode()) // if floor has ror, don't render effect
         {
             if ((pSector->floorpicnum >= 4080) && (pSector->floorpicnum <= 4095))
                 break;
@@ -3069,7 +3160,7 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
         auto pNSprite = viewInsertTSprite(pTSprite->sectnum, 32767, pTSprite);
         if (!pNSprite)
             break;
-        char bCalcSlope = gGameOptions.bSectorBehavior && !VanillaMode();
+        const char bCalcSlope = gGameOptions.bSectorBehavior && !VanillaMode();
         int zDiff = bCalcSlope ? getflorzofslope(pTSprite->sectnum, pTSprite->x, pTSprite->y) : pSector->floorz;
         pNSprite->x = pTSprite->x;
         pNSprite->y = pTSprite->y;
@@ -3162,7 +3253,7 @@ tspritetype *viewAddEffect(int nTSprite, VIEW_EFFECT nViewEffect)
     return NULL;
 }
 
-inline char viewApplyPlayerModel(int *nTile)
+inline char viewApplyPlayerAsCultist(int *nTile)
 {
     switch (*nTile)
     {
@@ -3251,14 +3342,11 @@ inline char viewApplyPlayerModel(int *nTile)
 LOCATION gPrevSpriteLoc[kMaxSprites];
 static LOCATION gViewSpritePredictLoc;
 
-static void viewApplyDefaultPal(tspritetype *pTSprite, sectortype const *pSector)
+inline void viewApplyFloorPal(tspritetype *pTSprite, uint8_t nPal)
 {
-    int const nXSector = pSector->extra;
-    XSECTOR const *pXSector = nXSector >= 0 ? &xsector[nXSector] : NULL;
-    if (pXSector && pXSector->color && (VanillaMode() || pSector->floorpal != 0))
-    {
-        pTSprite->pal = pSector->floorpal;
-    }
+    if (nPal == 0 && !VanillaMode()) // keep original sprite's palette when floors are using default palette (fixes tommy gun cultists in E3M2)
+        return;
+    pTSprite->pal = nPal;
 }
 
 void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t smooth)
@@ -3306,32 +3394,43 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             pTSprite->z = interpolate(pPrevLoc->z, pTSprite->z, gInterpolate);
             pTSprite->ang = pPrevLoc->ang+mulscale16(((pTSprite->ang-pPrevLoc->ang+1024)&2047)-1024, gInterpolate);
         }
-        if (!VanillaMode() && ((pTSprite->statnum == kStatDude) || (pTSprite->type == kThingVoodooHead)))
+        if (!VanillaMode())
         {
-            char bReplacedPlayerTile = 0;
-            while ((gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly)) // replace player caleb sprite with cultist sprite
+            if ((pTSprite->statnum == kStatItem) && (pTSprite->type == kItemTwoGuns) && (pTSprite->picnum == gPowerUpInfo[kPwUpTwoGuns].picnum) && gGameOptions.bQuadDamagePowerup)
             {
-                if (!(IsPlayerSprite(pTSprite) && gProfile[pTSprite->type-kDudePlayer1].nModel) && !(pTSprite->type == kThingVoodooHead && sprite[nSprite].inittype >= kDudePlayer1 && sprite[nSprite].inittype <= kDudePlayer8)) // if profile uses caleb, don't replace sprite
-                    break;
-                bReplacedPlayerTile = viewApplyPlayerModel(&nTile);
-                if (bReplacedPlayerTile) // set TSprite picnum and adjust tile to floor
-                {
-                    if (gSpriteHit[nXSprite].florhit) // only do this if player is standing on ground
-                    {
-                        int topnew, topold, bottomnew, bottomold;
-                        GetSpriteExtents(pTSprite, &topold, &bottomold);
-                        pTSprite->picnum = nTile;
-                        GetSpriteExtents(pTSprite, &topnew, &bottomnew);
-                        if (bottomnew != bottomold) // align bottom of new tile to old tile
-                            pTSprite->z -= bottomnew - bottomold;
-                    }
-                    else
-                        pTSprite->picnum = nTile;
-                }
-                break;
+                pTSprite->picnum = nTile = 30463; // if quad damage is enabled, replace guns akimbo icon with quad damage icon from notblood.pk3/TILES099.ART
             }
-            if ((EnemiesNotBlood() || bReplacedPlayerTile) && !gSpriteHit[nXSprite].florhit && (zvel[nSprite] > 250000) && ((nTile == 2825) || (nTile >= 2860 && nTile <= 2885)) && (bReplacedPlayerTile || (pTSprite->type == kDudeCultistTommy) || (pTSprite->type == kDudeCultistShotgun) || (pTSprite->type == kDudeCultistTommyProne) || (pTSprite->type == kDudeCultistShotgunProne) || (pTSprite->type == kDudeCultistTesla) || (pTSprite->type == kDudeCultistTNT) || (pTSprite->type == kDudeCultistBeast))) // replace tile with unused jump tile for falling cultists
-                nTile = pTSprite->picnum = (zvel[nSprite] <= 500000) ? 2890 : ((zvel[nSprite] <= 750000) ? 2895 : 2900);
+            else if ((pTSprite->statnum == kStatDude) || (pTSprite->type == kThingVoodooHead))
+            {
+                char bReplacedPlayerTile = 0;
+                while ((gGameOptions.nGameType != kGameTypeSinglePlayer) && !(gGameOptions.uNetGameFlags&kNetGameFlagCalebOnly)) // replace player caleb sprite with cultist sprite
+                {
+                    if (!(IsPlayerSprite(pTSprite) && gProfile[pTSprite->type-kDudePlayer1].nModel) && !(pTSprite->type == kThingVoodooHead && sprite[nSprite].inittype >= kDudePlayer1 && sprite[nSprite].inittype <= kDudePlayer8)) // if profile uses caleb, don't replace sprite
+                        break;
+                    bReplacedPlayerTile = viewApplyPlayerAsCultist(&nTile);
+                    if (bReplacedPlayerTile) // set TSprite picnum and adjust tile to floor
+                    {
+                        if (gSpriteHit[nXSprite].florhit) // only do this if player is standing on ground
+                        {
+                            int topnew, topold, bottomnew, bottomold;
+                            GetSpriteExtents(pTSprite, &topold, &bottomold);
+                            pTSprite->picnum = nTile;
+                            GetSpriteExtents(pTSprite, &topnew, &bottomnew);
+                            if (bottomnew != bottomold) // align bottom of new tile to old tile
+                                pTSprite->z -= bottomnew - bottomold;
+                        }
+                        else
+                            pTSprite->picnum = nTile;
+                    }
+                    break;
+                }
+                if ((EnemiesNotBlood() || bReplacedPlayerTile) && !gSpriteHit[nXSprite].florhit && (zvel[nSprite] > 250000) && ((nTile == 2825) || (nTile >= 2860 && nTile <= 2885))) // replace tile with unused jump tile for falling cultists
+                {
+                    const char bReplaceTile = bReplacedPlayerTile || (pTSprite->type == kDudeCultistTommy) || (pTSprite->type == kDudeCultistShotgun) || (pTSprite->type == kDudeCultistTommyProne) || (pTSprite->type == kDudeCultistShotgunProne) || (pTSprite->type == kDudeCultistTesla) || (pTSprite->type == kDudeCultistTNT) || (pTSprite->type == kDudeCultistBeast);
+                    if (bReplaceTile)
+                        nTile = pTSprite->picnum = (zvel[nSprite] <= 500000) ? 2890 : ((zvel[nSprite] <= 750000) ? 2895 : 2900);
+                }
+            }
         }
         int nAnim = 0;
         switch (picanm[nTile].extra & 7) {
@@ -3550,7 +3649,8 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                     }
                     break;
                 default:
-                    viewApplyDefaultPal(pTSprite, pSector);
+                    if (pXSector && pXSector->color)
+                        viewApplyFloorPal(pTSprite, pSector->floorpal);
                     break;
             }
         }
@@ -3580,8 +3680,8 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                 default:
                     if (pTSprite->type >= kItemKeySkull && pTSprite->type < kItemKeyMax)
                         pTSprite->shade = -128;
-
-                    viewApplyDefaultPal(pTSprite, pSector);
+                    if (pXSector && pXSector->color)
+                        viewApplyFloorPal(pTSprite, pSector->floorpal);
                     break;
             }
         }
@@ -3667,10 +3767,7 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                 }
             }
 
-
-            
-
-            if (pXSector && pXSector->color) pTSprite->pal = pSector->floorpal;
+            if (pXSector && pXSector->color) viewApplyFloorPal(pTSprite, pSector->floorpal);
             if (powerupCheck(gView, kPwUpBeastVision) > 0)
             {
                 pTSprite->shade = -128;
@@ -3694,8 +3791,6 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             }
 
             if (IsPlayerSprite(pTSprite)) {
-                viewApplyDefaultPal(pTSprite, pSector);
-
                 PLAYER *pPlayer = &gPlayer[pTSprite->type-kDudePlayer1];
                 const char bIsTeammate = IsTargetTeammate(gView, pPlayer->pSprite);
                 const char bIsDoppleganger = (gGameOptions.nGameType == kGameTypeTeams) && powerupCheck(pPlayer, kPwUpDoppleganger);
@@ -3713,8 +3808,16 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                 if (powerupCheck(pPlayer, kPwUpReflectShots)) {
                     viewAddEffect(nTSprite, kViewEffectReflectiveBall);
                 }
-                
-                if (gShowWeapon && (gGameOptions.nGameType != kGameTypeSinglePlayer) && gView && ((pPlayer == gView && gViewPos == VIEWPOS_1) || !(gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsAlways))) {
+
+                if (gPlayerTyping[pPlayer->nPlayer] && !VanillaMode()) {
+                    auto pNTSprite = viewAddEffect(nTSprite, kViewEffectFlag);
+                    if (pNTSprite) {
+                        pNTSprite->picnum = 30456; // use typing indicator icon tile from notblood.pk3/TILES099.ART
+                        pNTSprite->x += mulscale30(Cos((gCameraAng + kAng90) & kAngMask), 96); // offset to the right
+                        pNTSprite->y += mulscale30(Sin((gCameraAng + kAng90) & kAngMask), 96);
+                        pNTSprite->z -= 12<<8; // offset up
+                    }
+                } else if (gShowWeapon && (gGameOptions.nGameType != kGameTypeSinglePlayer) && gView && ((pPlayer == gView && gViewPos == VIEWPOS_1) || !(gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsAlways))) {
                     const char bDrawDudeWeap = !(powerupCheck(pPlayer, kPwUpShadowCloak) && (gGameOptions.uNetGameFlags&kNetGameFlagHideWeaponsCloak)) || bIsTeammateOrDoppleganger || (pPlayer == gView && gViewPos == VIEWPOS_1); // don't draw enemy weapon if they are cloaked
                     if (!VanillaMode() ? bDrawDudeWeap : (pPlayer != gView))
                         viewAddEffect(nTSprite, kViewEffectShowWeapon);
@@ -3769,7 +3872,7 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
                 }
             }
             
-            if (nSprite != gView->pSprite->index || gViewPos != VIEWPOS_0) {
+            if (nSprite != gView->pSprite->index || gViewPos != VIEWPOS_0 || (gMirrorDrawing && !VanillaMode())) {
                 if (getflorzofslope(pTSprite->sectnum, pTSprite->x, pTSprite->y) >= cZ)
                 {
                     viewAddEffect(nTSprite, kViewEffectShadow);
@@ -3801,7 +3904,8 @@ void viewProcessSprites(int32_t cX, int32_t cY, int32_t cZ, int32_t cA, int32_t 
             break;
         }
         case kStatThing: {
-            viewApplyDefaultPal(pTSprite, pSector);
+            if (pXSector && pXSector->color)
+                viewApplyFloorPal(pTSprite, pSector->floorpal);
 
             if (pTSprite->type < kThingBase || pTSprite->type >= kThingMax || !gSpriteHit[nXSprite].florhit) {
                 if ((pTSprite->flags & kPhysMove) && getflorzofslope(pTSprite->sectnum, pTSprite->x, pTSprite->y) >= cZ)
@@ -3967,50 +4071,6 @@ void CalcPosition(spritetype *pSprite, int *pX, int *pY, int *pZ, int *vsectnum,
     pSprite->cstat = bakCstat;
 }
 
-struct {
-    short nTile;
-    unsigned char nStat;
-    unsigned char nPal;
-    int nScale;
-    short nX, nY;
-} burnTable[9] = {
-     { 2101, RS_AUTO, 0, 118784, 10, 220 },
-     { 2101, RS_AUTO, 0, 110592, 40, 220 },
-     { 2101, RS_AUTO, 0, 81920, 85, 220 },
-     { 2101, RS_AUTO, 0, 69632, 120, 220 },
-     { 2101, RS_AUTO, 0, 61440, 160, 220 },
-     { 2101, RS_AUTO, 0, 73728, 200, 220 },
-     { 2101, RS_AUTO, 0, 77824, 235, 220 },
-     { 2101, RS_AUTO, 0, 110592, 275, 220 },
-     { 2101, RS_AUTO, 0, 122880, 310, 220 }
-};
-
-void viewBurnTime(int gScale)
-{
-    if (!gScale) return;
-
-    for (int i = 0; i < 9; i++)
-    {
-        const int nTile = burnTable[i].nTile+qanimateoffs(burnTable[i].nTile,32768+i);
-        int nScale = burnTable[i].nScale;
-        if (gScale < 600)
-        {
-            nScale = scale(nScale, gScale, 600);
-        }
-        int xoffset = burnTable[i].nX;
-        if (r_usenewaspect)
-        {
-            xoffset = scale(xoffset-(320>>1), 320>>1, 266>>1); // scale flame position
-            xoffset = scale(xoffset<<16, xscale, yscale); // multiply by window ratio
-            xoffset += (320>>1)<<16; // offset to center
-        }
-        else
-            xoffset <<= 16;
-        rotatesprite(xoffset, burnTable[i].nY<<16, nScale, 0, nTile,
-            0, burnTable[i].nPal, burnTable[i].nStat, windowxy1.x, windowxy1.y, windowxy2.x, windowxy2.y);
-    }
-}
-
 inline bool viewPaused(void)
 {
     if (gDemo.bPlaying)
@@ -4027,7 +4087,7 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
     int q16SlopeTilt = fix16_from_float(0.82f);
     int cX = 160;
     int cY = defaultHoriz;
-    if (!gCenterHoriz && (MIRRORMODE & 1)) // offset crosshair if mirror mode is set to vertical mode
+    if (!gCenterHoriz && (MIRRORMODE & 2)) // offset crosshair if mirror mode is set to vertical mode
         cY += 19;
     cX <<= 16;
     cY <<= 16;
@@ -4038,9 +4098,9 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
         const int q16hfov = divscale16(90, gFov);
         const int q16vfov = Blrintf(float(fix16_one) * fFov);
         int cZ = pPlayer->relAim.dy * 160 / pPlayer->relAim.dx; // calculate aiming target offset from center
-        if (MIRRORMODE & 1) // mirror mode flip
+        cX += mulscale16(cZ<<16, q16hfov) * (MIRRORMODE & 1 ? -1 : 1); // scale to current fov
+        if (MIRRORMODE & 2) // mirror mode flip
             cZ = -cZ;
-        cX += mulscale16(cZ<<16, q16hfov); // scale to current fov
         cZ = mulscale16((8<<4)<<16, q16vfov)>>16; // calculate vertical fov scale
         cZ = (pPlayer->relAim.dz / cZ)<<16; // convert target z to on screen units
         if (MIRRORMODE & 2) // mirror mode flip
@@ -4050,6 +4110,10 @@ inline void viewAimReticle(PLAYER *pPlayer, int defaultHoriz, fix16_t q16slopeho
         if (gSlopeTilting) // scale tilt with fov
             q16SlopeTilt = mulscale16(q16SlopeTilt, q16hfov);
     }
+    if (gAimReticleOffsetX)
+        cX += ((MIRRORMODE & 1) ? -gAimReticleOffsetX : gAimReticleOffsetX)<<15;
+    if (gAimReticleOffsetY)
+        cY += ((MIRRORMODE & 2) ? -gAimReticleOffsetY : gAimReticleOffsetY)<<15;
 
     if (!bPaused && gViewInterpolate && ((cXOld != cX) || (cY != cYOld)))
     {
@@ -4632,7 +4696,6 @@ void viewDrawScreen(void)
             }
             if (!sectRangeIsFine(pOther->pSprite->sectnum)) // sector is invalid, use self for crystal ball target
                 pOther = &gPlayer[gViewIndex];
-            //othercameraclock = gGameClock;
             if (!waloff[CRYSTALBALLBUFFER])
             {
                 tileAllocTile(CRYSTALBALLBUFFER, 128, 128, 0, 0);
@@ -4915,17 +4978,15 @@ RORHACK:
                 viewAimReticle(gView, defaultHoriz, q16slopehoriz, fFov);
             if (gProfile[gView->nPlayer].nWeaponHBobbing == 0) // disable weapon sway
                 v4c = 0;
-            if (!gWeaponInterpolate) // if position interpolate weapon is off, quantize the weapon positions
-            {
-                cX = (v4c>>8)+160;
-                cY = (v48>>8)+220+(zDelta>>7);
-                cX <<= 16;
-                cY <<= 16;
-            }
-            else // default
+            if (gWeaponInterpolate) // smooth motion
             {
                 cX = (v4c<<8)+(160<<16);
                 cY = (v48<<8)+(220<<16)+(zDelta<<9);
+            }
+            else // quantize like vanilla v1.21
+            {
+                cX = ((v4c>>8)+160)<<16;
+                cY = ((v48>>8)+220+(zDelta>>7))<<16;
             }
             int nShade = sector[nSectnum].floorshade; int nPalette = 0;
             if (sector[gView->pSprite->sectnum].extra > 0) {
@@ -5027,17 +5088,10 @@ RORHACK:
         gViewMap.Process(cX, cY, nAng);
     }
     viewDrawInterface(delta);
-    int zn = ((gView->zWeapon-gView->zView-(12<<8))>>7)+220;
-    PLAYER *pPSprite = &gPlayer[gMe->pSprite->type-kDudePlayer1];
-    if (IsPlayerSprite(gMe->pSprite) && pPSprite->hand == 1)
+    if (IsPlayerSprite(gView->pSprite) && (gView->hand == 1))
     {
-        //static int lastClock;
+        int zn = ((gView->zWeapon-gView->zView-(12<<8))>>7)+220;
         gChoke.Draw(160, zn);
-        //if ((gGameClock % 5) == 0 && gGameClock != lastClock)
-        //{
-        //    gChoke.swayV(pPSprite);
-        //}
-        //lastClock = gGameClock;
     }
     if (byte_1A76C6)
     {
@@ -5090,7 +5144,7 @@ RORHACK:
     else if (gView != gMe)
     {
         sprintf(gTempStr, "] %s [", gProfile[gView->nPlayer].name);
-        if (gColorMsg && !VanillaMode()) // color player name
+        if (!VanillaMode()) // color player name
         {
             COLORSTR colorStr = {playerColorPalMessage(gPlayer[gView->nPlayer].teamId), 0, {2, 2+(int)strlen(gProfile[gView->nPlayer].name)}, {-1, -1}};
             viewDrawText(0, gTempStr, 160, 10, 0, 0, 1, 0, 0, 0, &colorStr);
@@ -5258,6 +5312,7 @@ void viewSetRenderScale(char bShowRes)
     {
         if (bShowRes)
             OSD_Printf("Render resolution set to native res\n");
+        tileDelete(DOWNSCALEBUFFER);
         return;
     }
 
@@ -5268,7 +5323,6 @@ void viewSetRenderScale(char bShowRes)
         bRenderScaleRefresh = 1;
     else
         tileAllocTile(DOWNSCALEBUFFER, kMaxDownScale, kMaxDownScale, 0, 0);
-    walock[DOWNSCALEBUFFER] = CACHE1D_PERMANENT;
     tileSetSize(DOWNSCALEBUFFER, nSizeY, nSizeX);
 
     if (bShowRes)

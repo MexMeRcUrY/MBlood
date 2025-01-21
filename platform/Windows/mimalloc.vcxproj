@@ -47,15 +47,19 @@
     <ClCompile Include="..\..\source\mimalloc\src\alloc.c" />
     <ClCompile Include="..\..\source\mimalloc\src\arena.c" />
     <ClCompile Include="..\..\source\mimalloc\src\bitmap.c" />
+    <ClCompile Include="..\..\source\mimalloc\src\free.c">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\heap.c" />
     <ClCompile Include="..\..\source\mimalloc\src\init.c" />
+    <ClCompile Include="..\..\source\mimalloc\src\libc.c" />
     <ClCompile Include="..\..\source\mimalloc\src\options.c" />
     <ClCompile Include="..\..\source\mimalloc\src\os.c" />
     <ClCompile Include="..\..\source\mimalloc\src\page-queue.c">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\page.c" />
-    <ClCompile Include="..\..\source\mimalloc\src\prim\windows\prim.c" />
+    <ClCompile Include="..\..\source\mimalloc\src\prim\prim.c" />
     <ClCompile Include="..\..\source\mimalloc\src\random.c" />
     <ClCompile Include="..\..\source\mimalloc\src\segment-map.c" />
     <ClCompile Include="..\..\source\mimalloc\src\segment.c" />

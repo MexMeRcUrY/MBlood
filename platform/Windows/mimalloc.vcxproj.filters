@@ -58,10 +58,16 @@
     <ClCompile Include="..\..\source\mimalloc\src\bitmap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\mimalloc\src\free.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\heap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\init.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\mimalloc\src\libc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\options.c">
@@ -88,11 +94,11 @@
     <ClCompile Include="..\..\source\mimalloc\src\stats.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\mimalloc\src\prim\windows\prim.c">
-      <Filter>Source Files\prim</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\source\mimalloc\src\segment-map.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\mimalloc\src\prim\prim.c">
+      <Filter>Source Files\prim</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

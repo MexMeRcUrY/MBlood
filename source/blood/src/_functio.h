@@ -303,6 +303,92 @@ static const char * joystickanalogdefaults[MAXJOYAXES] =
 static const char * joystickdigitaldefaults[MAXJOYDIGITAL] =
    {
    };
+#else
+static const char * joystickdefaults[MAXJOYBUTTONSANDHATS] =
+   {
+   "Jump",
+   "Crouch",
+   "Open",
+   "Last_Weapon",
+   "",
+   "",
+   "",
+   "",
+   "Turn_Around",
+   "Previous_Weapon",
+   "Next_Weapon",
+   "Last_Weapon",
+   "Inventory_Use",
+   "Inventory_Left",
+   "Inventory_Right"
+   };
+
+
+static const char * joystickclickeddefaults[MAXJOYBUTTONSANDHATS] =
+   {
+   };
+
+
+static const char * joystickanalogdefaults[MAXJOYAXES] =
+   {
+   "analog_strafing",
+   "analog_moving",
+   "analog_turning",
+   "analog_lookingupanddown",
+   };
+
+
+static const int32_t joystickanalogscaledefaults[MAXJOYAXES] =
+   {
+   DEFAULTJOYSTICKANALOGUESCALE/2,
+   DEFAULTJOYSTICKANALOGUESCALE,
+   DEFAULTJOYSTICKANALOGUESCALE/3*2,
+   DEFAULTJOYSTICKANALOGUESCALE/4,
+   };
+
+
+static const int32_t joystickanalogdeaddefaults[MAXJOYAXES] =
+   {
+   DEFAULTJOYSTICKANALOGUEDEAD*5,
+   DEFAULTJOYSTICKANALOGUEDEAD*4,
+   DEFAULTJOYSTICKANALOGUEDEAD*2,
+   DEFAULTJOYSTICKANALOGUEDEAD*2,
+   };
+
+
+static const int32_t joystickanalogaxissolodeadzone[MAXJOYAXES] =
+   {
+   1,
+   0,
+   0,
+   0,
+   };
+
+
+static const int32_t joystickanalogsaturatedefaults[MAXJOYAXES] =
+   {
+   DEFAULTJOYSTICKANALOGUESATURATE*3,
+   DEFAULTJOYSTICKANALOGUESATURATE*3,
+   DEFAULTJOYSTICKANALOGUESATURATE*2,
+   DEFAULTJOYSTICKANALOGUESATURATE*2,
+   };
+
+
+static const char * joystickdigitaldefaults[MAXJOYDIGITAL] =
+   {
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "Weapon_Special_Fire",
+   "",
+   "Weapon_Fire",
+   };
 #endif
 
 #endif

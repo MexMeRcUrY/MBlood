@@ -365,15 +365,17 @@ void UpdateAimVector(PLAYER * pPlayer)
     WEAPONTRACK *pWeaponTrack = &gWeaponTrack[pPlayer->curWeapon];
     int nTarget = -1;
     pPlayer->aimTargetsCount = 0;
-    char bAutoAim = (gProfile[pPlayer->nPlayer].nAutoAim == 1) || (gProfile[pPlayer->nPlayer].nAutoAim == 2 && !pWeaponTrack->bIsProjectile);
+    const char bPitchforkFireBallReady = (pPlayer->curWeapon == kWeaponPitchfork) && (pPlayer->weaponState == 4) && (pPlayer->throwPower == 65536) && gGameOptions.bQuadDamagePowerup && WeaponsNotBlood() && !VanillaMode(); // never autoaim when ready to shoot fireball
+    const char bAutoAimWeapon = pPlayer->curWeapon == kWeaponVoodoo || pPlayer->curWeapon == kWeaponLifeLeech || (gProfile[pPlayer->nPlayer].nAutoAim == 4 && pPlayer->curWeapon == kWeaponPitchfork && !bPitchforkFireBallReady); // always autoaim for these weapons
+    char bAutoAim = (gProfile[pPlayer->nPlayer].nAutoAim == 1) || (gProfile[pPlayer->nPlayer].nAutoAim == 2 && !pWeaponTrack->bIsProjectile && !bPitchforkFireBallReady);
     char bOnlyTargetRatsEels = (gProfile[pPlayer->nPlayer].nAutoAim == 3) && !pWeaponTrack->bIsProjectile && (pPlayer->curWeapon != kWeaponVoodoo) && (pPlayer->curWeapon != kWeaponLifeLeech);
     if (!bAutoAim && WeaponsNotBlood() && !VanillaMode()) // use autoaim for pitchfork, or tommygun alt fire
     {
-        bAutoAim = ((pPlayer->curWeapon == kWeaponPitchfork) && !(powerupCheck(pPlayer, kPwUpTwoGuns) && gGameOptions.bQuadDamagePowerup)) || ((pPlayer->curWeapon == kWeaponTommy) && (pPlayer->weaponQav == 73 || pPlayer->weaponQav == 67));
+        bAutoAim = (pPlayer->curWeapon == kWeaponPitchfork && !bPitchforkFireBallReady) || ((pPlayer->curWeapon == kWeaponTommy) && (pPlayer->weaponQav == 73 || pPlayer->weaponQav == 67));
         if (bAutoAim)
             bOnlyTargetRatsEels = 0; // overrides rats/eels only targeting mode
     }
-    if (bAutoAim || bOnlyTargetRatsEels || (pPlayer->curWeapon == kWeaponVoodoo) || (pPlayer->curWeapon == kWeaponLifeLeech))
+    if (bAutoAim || bAutoAimWeapon || bOnlyTargetRatsEels)
     {
         if (gGameOptions.bSectorBehavior && !VanillaMode()) // check for ror so autoaim can work peering above water
             CheckLink(&x, &y, &z, &nSector);
@@ -681,8 +683,8 @@ void WeaponLower(PLAYER *pPlayer)
     if (checkLitSprayOrTNT(pPlayer))
         return;
     pPlayer->throwPower = pPlayer->throwPowerOld = 0;
-    const int prevWeapon = pPlayer->curWeapon;
     const int prevState = pPlayer->weaponState;
+    const int prevWeapon = pPlayer->curWeapon;
     switch (pPlayer->curWeapon)
     {
     case kWeaponPitchfork:
@@ -764,7 +766,7 @@ void WeaponLower(PLAYER *pPlayer)
         switch (prevState)
         {
         case 1:
-            if ((pPlayer->input.newWeapon == kWeaponSprayCan) && !VanillaMode()) // do not put away lighter if switched to spray can
+            if (!VanillaMode() && (pPlayer->input.newWeapon == kWeaponSprayCan)) // do not put away lighter if switched to spray can
             {
                 pPlayer->weaponState = 2;
                 StartQAV(pPlayer, 11, -1, 0);
@@ -985,7 +987,9 @@ void WeaponUpdateState(PLAYER *pPlayer)
             {
                 sfxPlay3DSound(pPlayer->pSprite, 410, 3, 2);
                 StartQAV(pPlayer, 57, nClientEjectShell, 0);
-                if (gInfiniteAmmo || pPlayer->ammoCount[2] > 1)
+                if (powerupCheck(pPlayer, kPwUpTwoGuns) && !gGameOptions.bQuadDamagePowerup && (gInfiniteAmmo || CheckAmmo(pPlayer, 2, 4)) && !VanillaMode()) // if we now have enough ammo to carry two shotguns, update the gun state and give back our second shotgun
+                    pPlayer->weaponState = 7;
+                else if (gInfiniteAmmo || pPlayer->ammoCount[2] > 1)
                     pPlayer->weaponState = 3;
                 else
                     pPlayer->weaponState = 2;
@@ -1295,6 +1299,8 @@ void FireShotgun(int nTrigger, PLAYER *pPlayer)
     }
     UseAmmo(pPlayer, pPlayer->weaponAmmo, nTrigger);
     pPlayer->flashEffect = 1;
+    if (pPlayer == gMe && powerupCheck(pPlayer, kPwUpTwoGuns))
+        ctrlJoystickRumble(n>>2);
 }
 
 void EjectShell(int, PLAYER *pPlayer)
@@ -1380,6 +1386,8 @@ void FireTommy(int nTrigger, PLAYER *pPlayer)
     }
     UseAmmo(pPlayer, pPlayer->weaponAmmo, nTrigger);
     pPlayer->flashEffect = 1;
+    if (pPlayer == gMe && powerupCheck(pPlayer, kPwUpTwoGuns))
+        ctrlJoystickRumble(nTrigger<<(gGameOptions.bQuadDamagePowerup && !VanillaMode() ? 5 : 3));
 }
 
 #define kMaxSpread 14
@@ -1505,6 +1513,8 @@ void AltFireSpread2(int nTrigger, PLAYER *pPlayer)
         WeaponLower(pPlayer);
         pPlayer->weaponState = -1;
     }
+    if (pPlayer == gMe && powerupCheck(pPlayer, kPwUpTwoGuns))
+        ctrlJoystickRumble(nTrigger<<3);
 }
 
 void FireFlare(int nTrigger, PLAYER *pPlayer)
@@ -2217,6 +2227,11 @@ void processLifeLeech(PLAYER *pPlayer)
         AltFireLifeLeech(1, pPlayer);
         pPlayer->weaponState = -1;
         pPlayer->throwPower = pPlayer->throwPowerOld = 0;
+        if (gInfiniteAmmo && !VanillaMode()) // keep lifeleech after dropping
+        {
+            pPlayer->hasWeapon[kWeaponLifeLeech] = 1;
+            pPlayer->weaponState = 2;
+        }
     }
 }
 
@@ -2993,6 +3008,11 @@ void WeaponProcess(PLAYER *pPlayer) {
                 StartQAV(pPlayer, 119, -1, 0);
                 AltFireLifeLeech(1, pPlayer);
                 pPlayer->weaponState = -1;
+                if (gInfiniteAmmo && !VanillaMode()) // keep lifeleech after dropping
+                {
+                    pPlayer->hasWeapon[kWeaponLifeLeech] = 1;
+                    pPlayer->weaponState = 2;
+                }
             }
             return;
         }

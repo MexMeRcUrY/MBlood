@@ -60,6 +60,7 @@ int gSendCheckTail = 0;
 int gCheckTail = 0;
 int gInitialNetPlayers = 0;
 int gBufferJitter = 1;
+int gPlayerTyping[8];
 int gPlayerReady[8];
 bool bNoResend = true;
 bool gRobust = false;
@@ -73,11 +74,9 @@ char gNetAddress[32];
 int gNetPort = kNetDefaultPort;
 int gNetPortLocal = -1;
 
-const short kNetVersion = 0x22A;
+const short kNetVersion = 0x22D;
 
 PKT_STARTGAME gPacketStartGame;
-
-#include "networkirc.cpp" // master list broadcasting logic
 
 #ifndef NETCODE_DISABLE
 ENetAddress gNetENetAddress;
@@ -247,6 +246,7 @@ void netResetState(void)
     gCheckTail = 0;
     bOutOfSync = 0;
     gBufferJitter = 1;
+    memset(gPlayerTyping, 0, sizeof(gPlayerTyping));
 }
 
 void CalcGameChecksum(void)
@@ -255,30 +255,18 @@ void CalcGameChecksum(void)
     gChecksum[0] = wrand();
     for (int p = connecthead; p >= 0; p = connectpoint2[p])
     {
-        int *pBuffer = &gPlayer[p].used1;
+        gChecksum[1] ^= gPlayer[p].CalcNonSpriteChecksum();
+
+        int *pBuffer = (int*)gPlayer[p].pSprite;
         int sum = 0;
-        int length = ((char*)&gPlayer[p+1]-(char*)pBuffer)/4;
-        while (length--)
-        {
-            sum += *pBuffer++;
-        }
-        gChecksum[1] ^= sum;
-        pBuffer = (int*)gPlayer[p].pSprite;
-        sum = 0;
-        length = sizeof(spritetype)/4;
+        int length = sizeof(spritetype)/4;
         while (length--)
         {
             sum += *pBuffer++;
         }
         gChecksum[2] ^= sum;
-        pBuffer = (int*)gPlayer[p].pXSprite;
-        sum = 0;
-        length = sizeof(XSPRITE)/4;
-        while (length--)
-        {
-            sum += *pBuffer++;
-        }
-        gChecksum[3] ^= sum;
+
+        gChecksum[3] ^= gPlayer[p].pXSprite->CalcChecksum();
     }
 }
 
@@ -377,6 +365,7 @@ void netGetPackets(void)
                         pInput->newWeapon = GetPacketByte(pPacket);
                     if (pInput->syncFlags.mlookChange)
                         pInput->q16mlook = GetPacketDWord(pPacket);
+                    gPlayerTyping[p] = pInput->keyFlags.isTyping;
                     gNetFifoHead[p]++;
                 }
                 else
@@ -437,6 +426,7 @@ void netGetPackets(void)
                 pInput->newWeapon = GetPacketByte(pPacket);
             if (pInput->syncFlags.mlookChange)
                 pInput->q16mlook = GetPacketDWord(pPacket);
+            gPlayerTyping[nPlayer] = pInput->keyFlags.isTyping;
             gNetFifoHead[nPlayer]++;
             while (pPacket < packet+nSize)
             {
@@ -474,6 +464,7 @@ void netGetPackets(void)
                 pInput->newWeapon = GetPacketByte(pPacket);
             if (pInput->syncFlags.mlookChange)
                 pInput->q16mlook = GetPacketDWord(pPacket);
+            gPlayerTyping[nPlayer] = pInput->keyFlags.isTyping;
             gNetFifoHead[nPlayer]++;
             while (pPacket < packet+nSize)
             {
@@ -781,6 +772,7 @@ void netMasterUpdate(void)
                 PutPacketByte(pPacket, pInput->newWeapon);
             if (pInput->syncFlags.mlookChange)
                 PutPacketDWord(pPacket, pInput->q16mlook);
+            gPlayerTyping[p] = pInput->keyFlags.isTyping;
         }
         if ((gNetFifoMasterTail&15) == 0)
         {
@@ -898,6 +890,7 @@ void netGetInput(void)
             PutPacketByte(pPacket, input.newWeapon);
         if (input.syncFlags.mlookChange)
             PutPacketDWord(pPacket, input.q16mlook);
+        gPlayerTyping[myconnectindex] = input.keyFlags.isTyping;
         while (gSendCheckTail != gCheckHead[myconnectindex])
         {
             unsigned int *checkSum = gCheckFifo[gSendCheckTail&255][myconnectindex];
@@ -935,6 +928,7 @@ void netGetInput(void)
             PutPacketByte(pPacket, input.newWeapon);
         if (input.syncFlags.mlookChange)
             PutPacketDWord(pPacket, input.q16mlook);
+        gPlayerTyping[myconnectindex] = input.keyFlags.isTyping;
         if (((gNetFifoHead[myconnectindex]-1)&15) == 0)
         {
             int t = myMinLag[connecthead]-otherMinLag;
@@ -966,7 +960,7 @@ void netGetInput(void)
     netMasterUpdate();
 }
 
-void netInitialize(bool bConsole, bool bAnnounce)
+void netInitialize(bool bConsole)
 {
     netDeinitialize();
     memset(gPlayerReady, 0, sizeof(gPlayerReady));
@@ -989,7 +983,6 @@ void netInitialize(bool bConsole, bool bAnnounce)
     }
     if (gNetMode == NETWORK_SERVER)
     {
-        int nIRCState = 0;
         memset(gNetPlayerPeer, 0, sizeof(gNetPlayerPeer));
         ENetEvent event;
         gNetENetAddress.host = ENET_HOST_ANY;
@@ -1009,15 +1002,7 @@ void netInitialize(bool bConsole, bool bAnnounce)
         {
             char buffer[128];
             sprintf(buffer, "Waiting for players (%i\\%i)", numplayers, gNetPlayers);
-            if (bAnnounce)
-            {
-                nIRCState = netIRCIinitialize();
-                viewLoadingScreen(gMenuPicnum, "Network Game", buffer, nIRCState ? "Broadcasting..." : "Broadcast failed");
-            }
-            else
-            {
-                viewLoadingScreen(gMenuPicnum, "Network Game", NULL, buffer);
-            }
+            viewLoadingScreen(gMenuPicnum, "Network Game", NULL, buffer);
             videoNextPage();
         }
         while (numplayers < gNetPlayers)
@@ -1026,13 +1011,11 @@ void netInitialize(bool bConsole, bool bAnnounce)
             if (quitevent)
             {
                 netServerDisconnect();
-                netIRCDeinitialize();
                 QuitGame();
             }
             if (!bConsole && KB_KeyPressed(sc_Escape))
             {
                 netServerDisconnect();
-                netIRCDeinitialize();
                 netDeinitialize();
                 netResetToSinglePlayer();
                 return;
@@ -1100,18 +1083,6 @@ void netInitialize(bool bConsole, bool bAnnounce)
                 }
                 default:
                     break;
-                }
-            }
-            if (bAnnounce)
-            {
-                const int curIRCState = netIRCProcess();
-                if (nIRCState != curIRCState)
-                {
-                    nIRCState = curIRCState;
-                    char buffer[128];
-                    sprintf(buffer, "Waiting for players (%i\\%i)", numplayers, gNetPlayers);
-                    viewLoadingScreen(gMenuPicnum, "Network Game", buffer, nIRCState ? (nIRCState > 1 ? "Broadcasting to public" : "Broadcasting...") : "Broadcast failed");
-                    videoNextPage();
                 }
             }
             enet_host_service(gNetENetServer, NULL, 0);
@@ -1200,7 +1171,7 @@ void netInitialize(bool bConsole, bool bAnnounce)
             if (gNetRetry && !KB_KeyPressed(sc_Escape))
             {
                 gNetMode = NETWORK_CLIENT;
-                return netInitialize(bConsole, bAnnounce);
+                return netInitialize(bConsole);
             }
             return;
         }
@@ -1425,13 +1396,6 @@ void faketimerhandler(void)
 #ifndef NETCODE_DISABLE
     if (gNetMode != NETWORK_NONE && gNetENetInit)
         netUpdate();
-#if 0
-    if (gGameClock >= gNetFifoClock && ready2send)
-    {
-        gNetFifoClock += kTicsPerFrame;
-        netGetInput();
-    }
-#endif
 #endif
     //if (gNetMode != NETWORK_NONE && gNetENetInit)
     //    enet_host_service(gNetMode == NETWORK_SERVER ? gNetENetServer : gNetENetClient, NULL, 0);

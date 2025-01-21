@@ -87,17 +87,17 @@ bool dudeIsPlayingSeq(spritetype *pSprite, int nSeq)
     return false;
 }
 
-void aiPlay3DSound(spritetype *pSprite, int a2, AI_SFX_PRIORITY a3, int a4)
+void aiPlay3DSound(spritetype *pSprite, int soundId, AI_SFX_PRIORITY nPriority, int chanId)
 {
     DUDEEXTRA *pDudeExtra = &gDudeExtra[pSprite->extra];
-    if (a3 == AI_SFX_PRIORITY_0)
-        sfxPlay3DSound(pSprite, a2, a4, 2);
-    else if (a3 > pDudeExtra->sfx_priority || pDudeExtra->clock <= (int)gFrameClock)
+    if (nPriority == AI_SFX_PRIORITY_0)
+        sfxPlay3DSound(pSprite, soundId, chanId, 2);
+    else if (nPriority > pDudeExtra->sfx_priority || pDudeExtra->clock <= (int)gFrameClock)
     {
         sfxKill3DSound(pSprite, -1, -1);
-        sfxPlay3DSound(pSprite, a2, a4, 0);
-        pDudeExtra->sfx_priority = a3;
-        pDudeExtra->clock = (int)gFrameClock+120;
+        sfxPlay3DSound(pSprite, soundId, chanId, 0);
+        pDudeExtra->sfx_priority = nPriority;
+        pDudeExtra->clock = (int)gFrameClock+kTicRate;
     }
 }
 
@@ -384,6 +384,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
     case kDudeCultistTNT:
     case kDudeCultistBeast:
     {
+        const int nChannel = EnemiesNBlood() && !VanillaMode() ? kMaxSprites+pSprite->index : -1; // use kMaxSprites+sprite index as channel, so cultist alerts can be muted on death/hurt state
         DUDEEXTRA_STATS *pDudeExtraE = &gDudeExtra[pSprite->extra].stats;
         pDudeExtraE->active = 1;
         if (pXSprite->target == -1) {
@@ -391,8 +392,8 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
                 case kMediumNormal:
                     aiNewState(pSprite, pXSprite, &cultistSearch);
                     if (Chance(0x8000)) {
-                        if (pSprite->type == kDudeCultistTommy) aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, -1);
-                        else aiPlay3DSound(pSprite, 1008+Random(5), AI_SFX_PRIORITY_1, -1);
+                        if (pSprite->type == kDudeCultistTommy) aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, nChannel);
+                        else aiPlay3DSound(pSprite, 1008+Random(5), AI_SFX_PRIORITY_1, nChannel);
                     }
                     break;
                 case kMediumWater:
@@ -402,8 +403,8 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
             }
         } else {
             if (Chance(0x8000)) {
-                if (pSprite->type == kDudeCultistTommy) aiPlay3DSound(pSprite, 4003+Random(4), AI_SFX_PRIORITY_1, -1);
-                else aiPlay3DSound(pSprite, 1003+Random(4), AI_SFX_PRIORITY_1, -1);
+                if (pSprite->type == kDudeCultistTommy) aiPlay3DSound(pSprite, 4003+Random(4), AI_SFX_PRIORITY_1, nChannel);
+                else aiPlay3DSound(pSprite, 1003+Random(4), AI_SFX_PRIORITY_1, nChannel);
             }
             switch (pXSprite->medium) {
                 case kMediumNormal:
@@ -424,6 +425,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
         return;
 #endif
     case kDudeCultistTommyProne: {
+        const int nChannel = EnemiesNBlood() && !VanillaMode() ? kMaxSprites+pSprite->index : -1; // use kMaxSprites+sprite index as channel, so cultist alerts can be muted on death/hurt state
         DUDEEXTRA_STATS *pDudeExtraE = &gDudeExtra[pSprite->extra].stats;
         pDudeExtraE->active = 1;
         pSprite->type = kDudeCultistTommy;
@@ -432,7 +434,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
                 case 0:
                     aiNewState(pSprite, pXSprite, &cultistSearch);
                     if (Chance(0x8000))
-                        aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, -1);
+                        aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, nChannel);
                     break;
                 case kMediumWater:
                 case kMediumGoo:
@@ -441,8 +443,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
             }
         } else {
             if (Chance(0x8000))
-                aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, -1);
-            
+                aiPlay3DSound(pSprite, 4008+Random(5), AI_SFX_PRIORITY_1, nChannel);
             switch (pXSprite->medium) {
                 case kMediumNormal:
                     aiNewState(pSprite, pXSprite, &cultistProneChase);
@@ -457,6 +458,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
     }
     case kDudeCultistShotgunProne:
     {
+        const int nChannel = EnemiesNBlood() && !VanillaMode() ? kMaxSprites+pSprite->index : -1; // use kMaxSprites+sprite index as channel, so cultist alerts can be muted on death/hurt state
         DUDEEXTRA_STATS *pDudeExtraE = &gDudeExtra[pSprite->extra].stats;
         pDudeExtraE->active = 1;
         pSprite->type = kDudeCultistShotgun;
@@ -467,7 +469,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
             case kMediumNormal:
                 aiNewState(pSprite, pXSprite, &cultistSearch);
                 if (Chance(0x8000))
-                    aiPlay3DSound(pSprite, 1008+Random(5), AI_SFX_PRIORITY_1, -1);
+                    aiPlay3DSound(pSprite, 1008+Random(5), AI_SFX_PRIORITY_1, nChannel);
                 break;
             case kMediumWater:
             case kMediumGoo:
@@ -478,7 +480,7 @@ void aiActivateDude(spritetype *pSprite, XSPRITE *pXSprite)
         else
         {
             if (Chance(0x8000))
-                aiPlay3DSound(pSprite, 1003+Random(4), AI_SFX_PRIORITY_1, -1);
+                aiPlay3DSound(pSprite, 1003+Random(4), AI_SFX_PRIORITY_1, nChannel);
             switch (pXSprite->medium)
             {
             case kMediumNormal:
@@ -1717,7 +1719,7 @@ void aiInitSprite(spritetype *pSprite)
                 
                 // start new patrol
                 pXSprite->target = -1;
-                aiPatrolSetMarker(pSprite, pXSprite);
+                patrol = (aiPatrolSetMarker(pSprite, pXSprite) > 0);
             }
             else if (rngok(target, 1, kMaxSprites))
             {
@@ -1765,7 +1767,7 @@ void AILoadSave::Load(void)
 {
     Read(cumulDamage, sizeof(cumulDamage));
     Read(gDudeSlope, sizeof(gDudeSlope));
-    Read(&gDudeExtra, sizeof(gDudeExtra));
+    Read(gDudeExtra, sizeof(gDudeExtra));
     memset(gSpriteStuckage, 0, sizeof(gSpriteStuckage));
     memset((void *)&gSpritePrevLoc, 0, sizeof(gSpritePrevLoc));
     memset(gSpritePrevSect, -1, sizeof(gSpritePrevSect));
@@ -1775,7 +1777,7 @@ void AILoadSave::Save(void)
 {
     Write(cumulDamage, sizeof(cumulDamage));
     Write(gDudeSlope, sizeof(gDudeSlope));
-    Write(&gDudeExtra, sizeof(gDudeExtra));
+    Write(gDudeExtra, sizeof(gDudeExtra));
 }
 
 static AILoadSave *myLoadSave;
